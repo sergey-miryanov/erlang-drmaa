@@ -1,4 +1,6 @@
 #include "drmaa_drv.h"
+#include <stdio.h>
+#include <string.h>
 
 static ErlDrvEntry driver_entry__ = {
   NULL,                             /* init */
@@ -92,6 +94,15 @@ stop (ErlDrvData p)
   driver_free (drv);
 }
 
+#define SET_ATTR(NAME)                              \
+  case CMD_##NAME:                                  \
+    set_attr (drv, DRMAA_##NAME, buf, len);         \
+    break;
+#define SET_V_ATTR(NAME)                            \
+  case CMD_##NAME:                                  \
+    set_vector_attr (drv, DRMAA_##NAME, buf, len);  \
+    break;
+
 static int
 control (ErlDrvData p,
          unsigned int command,
@@ -102,20 +113,57 @@ control (ErlDrvData p,
 {
   drmaa_drv_t *drv = (drmaa_drv_t *) (p);
 
+  fprintf (drv->log, "buf/%d: %s\n", len, buf);
+  fprintf (drv->log, "rbuf/%d: %s\n", rlen, *rbuf);
+  fflush (drv->log);
+
   switch (command)
     {
     case CMD_ALLOCATE_JOB_TEMPLATE:
       allocate_job_template (drv, buf, len);
       break;
-    case CMD_SET_REMOTE_COMMAND:
-      set_remote_command (drv, buf, len);
-      break;
-    case CMD_SET_V_ARGV:
-      set_v_argv (drv, buf, len);
+    case CMD_DELETE_JOB_TEMPLATE:
+      delete_job_template (drv, buf, len);
       break;
     case CMD_RUN_JOB:
       run_job (drv, buf, len);
       break;
+    case CMD_RUN_BULK_JOBS:
+      run_bulk_jobs (drv, buf, len);
+      break;
+    case CMD_CONTROL:
+      control_drmaa (drv, buf, len);
+      break;
+    case CMD_JOB_PS:
+      job_ps (drv, buf, len);
+      break;
+    case CMD_SYNCHRONIZE:
+      synchronize (drv, buf, len);
+      break;
+    case CMD_WAIT:
+      wait (drv, buf, len);
+      break;
+    SET_ATTR (BLOCK_EMAIL);
+    SET_ATTR (DEADLINE_TIME);
+    SET_ATTR (DURATION_HLIMIT);
+    SET_ATTR (DURATION_SLIMIT);
+    SET_ATTR (ERROR_PATH);
+    SET_ATTR (INPUT_PATH);
+    SET_ATTR (JOB_CATEGORY);
+    SET_ATTR (JOB_NAME);
+    SET_ATTR (JOIN_FILES);
+    SET_ATTR (JS_STATE);
+    SET_ATTR (NATIVE_SPECIFICATION);
+    SET_ATTR (OUTPUT_PATH);
+    SET_ATTR (REMOTE_COMMAND);
+    SET_ATTR (START_TIME);
+    SET_ATTR (TRANSFER_FILES);
+    //SET_V_ATTR (V_ARGV);
+    //SET_V_ATTR (V_EMAIL);
+    //SET_V_ATTR (V_ENV);
+    SET_ATTR (WCT_HLIMIT);
+    SET_ATTR (WCT_SLIMIT);
+    SET_ATTR (WD);
     default:
       unknown (drv, buf, len);
       break;
@@ -143,6 +191,18 @@ unknown (drmaa_drv_t *drv, char *command, int len)
                              sizeof (spec) / sizeof (spec[0]));
 }
 
+static int
+send_atom (drmaa_drv_t *drv, char *atom)
+{
+  ErlDrvTermData spec[] = {
+      ERL_DRV_ATOM, driver_mk_atom (atom),
+      ERL_DRV_TUPLE, 1
+  };
+
+  return driver_output_term (drv->port,
+                             spec,
+                             sizeof (spec) / sizeof (spec[0]));
+}
 
 static int
 allocate_job_template (drmaa_drv_t *drv, 
@@ -153,69 +213,18 @@ allocate_job_template (drmaa_drv_t *drv,
   if (is_error (drv->err_no))
     {
       fprintf (drv->log, "Couldn't allocate job template: %s\n", drv->err_msg);
-      return 1;
+      return send_atom (drv, "error");
     }
 
+  return send_atom (drv, "ok");
+}
+
+static int
+delete_job_template (drmaa_drv_t *drv,
+                     char *command,
+                     int len)
+{
   return 0;
-}
-
-static int
-set_attr (drmaa_drv_t *drv,
-          const char *name,
-          const char *value)
-{
-  drv->err_no = drmaa_set_attribute (drv->job_template,
-                                     name,
-                                     value,
-                                     drv->err_msg,
-                                     DRMAA_ERROR_STRING_BUFFER);
-  if (is_error (drv->err_no))
-    {
-      fprintf (drv->log, "Couldn't set attribute \"%s\": %s\n",
-               name,
-               drv->err_msg);
-      return 1;
-    }
-
-  return 0;
-}
-
-static int
-set_vector_attr (drmaa_drv_t *drv,
-                 const char *name,
-                 const char *values[])
-{
-  drv->err_no = drmaa_set_vector_attribute (drv->job_template,
-                                            name,
-                                            values,
-                                            drv->err_msg,
-                                            DRMAA_ERROR_STRING_BUFFER);
-  if (is_error (drv->err_no))
-    {
-      fprintf (drv->log, "Couldn't set attribute \"%s\": %s\n",
-               name,
-               drv->err_msg);
-      return 1;
-    }
-
-  return 0;
-}
-
-static int
-set_remote_command (drmaa_drv_t *drv,
-                    char *command,
-                    int len)
-{
-  return set_attr (drv, DRMAA_REMOTE_COMMAND, "python");
-}
-
-static int
-set_v_argv (drmaa_drv_t *drv,
-            char *command,
-            int len)
-{
-  const char *args[] = {"run_alpha_script.py", NULL};
-  return set_vector_attr (drv, DRMAA_V_ARGV, args);
 }
 
 static int
@@ -232,7 +241,7 @@ run_job (drmaa_drv_t *drv,
   if (is_error (drv->err_no))
     {
       fprintf (drv->log, "Coldn't submit job: %s\n", drv->err_msg);
-      return 1;
+      return send_atom (drv, "error");
     }
   else
     {
@@ -242,12 +251,97 @@ run_job (drmaa_drv_t *drv,
   fflush (drv->log);
   ErlDrvTermData spec[] = {
     ERL_DRV_ATOM, driver_mk_atom ("ok"),
-    ERL_DRV_STRING, (ErlDrvTermData)job_id,
+    ERL_DRV_STRING, (ErlDrvTermData)job_id, strlen (job_id),
     ERL_DRV_TUPLE, 2
   };
 
   return driver_output_term (drv->port,
                              spec,
                              sizeof (spec) / sizeof (spec[0]));
+}
+
+static int
+run_bulk_jobs (drmaa_drv_t *drv,
+               char *command,
+               int len)
+{
+  return 0;
+}
+
+static int
+control_drmaa (drmaa_drv_t *drv,
+               char *command,
+               int len)
+{
+  return 0;
+}
+
+static int
+job_ps (drmaa_drv_t *drv,
+        char *command,
+        int len)
+{
+  return 0;
+}
+
+static int 
+synchronize (drmaa_drv_t *drv,
+             char *command,
+             int len)
+{
+  return 0;
+}
+
+static int 
+wait (drmaa_drv_t *drv,
+      char *command,
+      int len)
+{
+  return 0;
+}
+
+static int
+set_attr (drmaa_drv_t *drv,
+          const char *name,
+          char *value,
+          int len)
+{
+  value[len] = 0;
+  drv->err_no = drmaa_set_attribute (drv->job_template,
+                                     name,
+                                     value,
+                                     drv->err_msg,
+                                     DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't set attribute \"%s\": %s\n",
+               name,
+               drv->err_msg);
+      return send_atom (drv, "error");
+    }
+
+  return send_atom (drv, "ok");
+}
+
+static int
+set_vector_attr (drmaa_drv_t *drv,
+                 const char *name,
+                 const char *values[],
+                 int len)
+{
+  drv->err_no = drmaa_set_vector_attribute (drv->job_template,
+                                            name,
+                                            values,
+                                            drv->err_msg,
+                                            DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't set attribute \"%s\": %s\n",
+               name,
+               drv->err_msg);
+      return 1;
+    }
+
+  return 0;
 }
 

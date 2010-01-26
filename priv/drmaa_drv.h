@@ -4,9 +4,34 @@
 #include <erl_interface.h>
 
 #define CMD_ALLOCATE_JOB_TEMPLATE   1
-#define CMD_SET_REMOTE_COMMAND      2
-#define CMD_SET_V_ARGV              3
-#define CMD_RUN_JOB                 4
+#define CMD_DELETE_JOB_TEMPLATE     2
+#define CMD_RUN_JOB                 3
+#define CMD_RUN_BULK_JOBS           4
+#define CMD_CONTROL                 5
+#define CMD_JOB_PS                  6
+#define CMD_SYNCHRONIZE             7
+#define CMD_WAIT                    8
+#define CMD_BLOCK_EMAIL             9
+#define CMD_DEADLINE_TIME           10
+#define CMD_DURATION_HLIMIT         11
+#define CMD_DURATION_SLIMIT         12
+#define CMD_ERROR_PATH              13
+#define CMD_INPUT_PATH              14
+#define CMD_JOB_CATEGORY            15
+#define CMD_JOB_NAME                16
+#define CMD_JOIN_FILES              17
+#define CMD_JS_STATE                18
+#define CMD_NATIVE_SPECIFICATION    19
+#define CMD_OUTPUT_PATH             20
+#define CMD_REMOTE_COMMAND          21
+#define CMD_START_TIME              22
+#define CMD_TRANSFER_FILES          23
+#define CMD_V_ARGV                  24
+#define CMD_V_EMAIL                 25
+#define CMD_V_ENV                   26
+#define CMD_WCT_HLIMIT              27
+#define CMD_WCT_SLIMIT              28
+#define CMD_WD                      29
 
 typedef struct drmaa_drv_t {
   char                  err_msg[DRMAA_ERROR_STRING_BUFFER];
@@ -37,27 +62,64 @@ unknown (drmaa_drv_t *drv,
          char *command,
          int len);
 
+static int 
+send_atom (drmaa_drv_t *drv,
+           char *atom);
+
 static void
 ready_async (ErlDrvData drv_data,
              ErlDrvThreadData thread_data);
 
+/* API */
 static int
 allocate_job_template (drmaa_drv_t *drv, 
                        char *command,
                        int len);
 
-static int 
-set_remote_command (drmaa_drv_t *drv,
-                    char *command,
-                    int len);
-
 static int
-set_v_argv (drmaa_drv_t *drv,
-            char *command,
-            int len);
+delete_job_template (drmaa_drv_t *drv,
+                     char *command,
+                     int len);
 
 static int
 run_job (drmaa_drv_t *drv,
          char *command,
          int len);
+
+static int
+run_bulk_jobs (drmaa_drv_t *drv,
+               char *command,
+               int len);
+
+static int
+control_drmaa (drmaa_drv_t *drv,
+               char *command,
+               int len);
+
+static int 
+job_ps (drmaa_drv_t *drv,
+        char *command,
+        int len);
+
+static int
+synchronize (drmaa_drv_t *drv,
+             char *command,
+             int len);
+
+static int
+wait (drmaa_drv_t *drv,
+      char *buffer,
+      int len);
+
+static int
+set_attr (drmaa_drv_t *drv,
+          const char *name,
+          char *value,
+          int len);
+
+static int
+set_vector_attr (drmaa_drv_t *drv,
+                 const char *name,
+                 const char *value[],
+                 int len);
 
