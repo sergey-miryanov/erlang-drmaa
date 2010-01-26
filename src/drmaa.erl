@@ -18,6 +18,7 @@
 %% API
 -export ([allocate_job_template/0, delete_job_template/0]).
 -export ([run_job/0]).
+-export ([wait/1]).
 -export ([join_files/1]).
 -export ([remote_command/1, args/1, env/1]).
 
@@ -69,6 +70,9 @@ delete_job_template () ->
 
 run_job () ->
   gen_server:call (drmaa, {run_job}).
+
+wait (JobID) when is_list (JobID) ->
+  gen_server:call (drmaa, {wait, JobID}).
 
 join_files (Join) when (Join == true) or (Join == false) ->
   gen_server:call (drmaa, {join_files, Join}).
@@ -123,6 +127,10 @@ handle_call ({delete_job_template}, _From, #state {port = Port} = State) ->
 handle_call ({run_job}, _From, #state {port = Port} = State) ->
   {ok, JobID} = drmaa:control (Port, ?CMD_RUN_JOB),
   {reply, {ok, JobID}, State};
+handle_call ({wait, JobID}, _From, #state {port = Port} = State) ->
+  {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} 
+    = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (JobID)),
+  {reply, {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}}, State};
 handle_call ({join_files, Join}, _From, #state {port = Port} = State) ->
   Bin = erlang:list_to_binary (erlang:atom_to_list (Join)),
   Reply = drmaa:control (Port, ?CMD_JOIN_FILES, Bin),

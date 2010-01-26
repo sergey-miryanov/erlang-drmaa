@@ -340,7 +340,167 @@ wait (drmaa_drv_t *drv,
       char *command,
       int len)
 {
-  return 0;
+  command[len] = 0;
+
+  char job_out[DRMAA_JOBNAME_BUFFER] = {0};
+  int status = 0;
+  drmaa_attr_values_t *rusage = NULL;
+
+  drv->err_no = drmaa_wait (command, job_out, DRMAA_JOBNAME_BUFFER,
+                            &status, DRMAA_TIMEOUT_WAIT_FOREVER,
+                            &rusage, 
+                            drv->err_msg, DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't wait for job: %s\n", drv->err_msg);
+      fflush (drv->log);
+
+      return send_error (drv, "error", drv->err_msg);
+    }
+
+  char *exit_type = 0;
+  int exit_status = 0;
+  char term_signal [DRMAA_SIGNAL_BUFFER + 1] = {0};
+  int has_term_signal = 0;
+
+  if (!exit_type)
+    {
+      int aborted = 0;
+      drmaa_wifaborted (&aborted, status, NULL, 0);
+      if (aborted)
+        {
+          exit_type = "aborted";
+
+          fprintf (drv->log, "Job %s never ran\n", command);
+          fflush (drv->log);
+        }
+    }
+
+  if (!exit_type)
+    {
+      int exited = 0;
+      drmaa_wifexited (&exited, status, NULL, 0);
+      if (exited)
+        {
+          exit_type = "exited";
+          drmaa_wexitstatus (&exit_status, status, NULL, 0);
+
+          fprintf (drv->log, "Job %s finished regularly with exit status %d\n", command, exit_status);
+          fflush (drv->log);
+        }
+    }
+
+  if (!exit_type)
+    {
+      int signaled = 0;
+      drmaa_wifsignaled (&signaled, status, NULL, 0);
+      if (signaled)
+        {
+          exit_type = "signaled";
+          has_term_signal = 1;
+          drmaa_wtermsig (term_signal, DRMAA_SIGNAL_BUFFER,
+                         status, NULL, 0);
+
+          fprintf (drv->log, "Job %s finished due to signal %s\n", command, term_signal);
+          fflush (drv->log);
+        }
+    }
+
+  if (!exit_type)
+    {
+      exit_type = "unclear";
+      fprintf (drv->log, "Job %s finished with unclear conditions\n", command);
+      fflush (drv->log);
+    }
+
+  int attr_num = 0;
+  drv->err_no = drmaa_get_num_attr_values (rusage, &attr_num);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't get number of attribute values\n");
+      fflush (drv->log);
+
+      drmaa_release_attr_values (rusage);
+      return send_error (drv, "error", "Couldn't get number of attribute values");
+    }
+
+  ErlDrvTermData spec[] = {
+      ERL_DRV_ATOM, driver_mk_atom ("ok"),
+      ERL_DRV_ATOM, driver_mk_atom ("exit"),
+      ERL_DRV_STRING, (ErlDrvTermData)exit_type, strlen (exit_type),
+      ERL_DRV_TUPLE, 2,
+      ERL_DRV_ATOM, driver_mk_atom ("exit_status"),
+      ERL_DRV_INT, exit_status,
+      ERL_DRV_TUPLE, 2,
+      ERL_DRV_ATOM, driver_mk_atom ("usage"),
+  };
+
+  size_t spec_num = sizeof (spec) / sizeof (spec[0]);
+  size_t result_num = spec_num + 3 * attr_num + 1 + 2 + 2 + 2;
+  ErlDrvTermData *result = (ErlDrvTermData *)driver_alloc (sizeof (ErlDrvTermData) * result_num);
+  if (!result)
+    {
+      fprintf (drv->log, "Couldn't allocate memory for reply\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Couldn't allocate memory");
+    }
+
+  size_t idx = 0;
+  for (; idx < spec_num; ++idx)
+    {
+      result[idx] = spec[idx];
+    }
+
+  fprintf (drv->log, "Usage: \n");
+  fflush (drv->log);
+
+  typedef char usage_t[DRMAA_ERROR_STRING_BUFFER];
+  usage_t *usage = (usage_t *)driver_alloc (sizeof (usage_t) * attr_num);
+  if (!usage)
+    {
+      fprintf (drv->log, "Couldn't allocate memory for usage\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Couldn't allocate usage");
+    }
+
+  size_t usage_idx = 0;
+  for (; usage_idx < attr_num; ++usage_idx)
+    {
+      int err_no = drmaa_get_next_attr_value (rusage,
+                                              usage[usage_idx],
+                                              sizeof (usage_t));
+      if (err_no == DRMAA_ERRNO_SUCCESS)
+        {
+          result[idx++] = ERL_DRV_STRING;
+          result[idx++] = (ErlDrvTermData)usage[usage_idx];
+          result[idx++] = strlen (usage[usage_idx]);
+
+          fprintf (drv->log, "  %s\n", usage[usage_idx]);
+          fflush (drv->log);
+        }
+    }
+
+  result[idx++] = ERL_DRV_NIL;
+  result[idx++] = ERL_DRV_LIST;
+  result[idx++] = attr_num + 1;
+  result[idx++] = ERL_DRV_TUPLE;
+  result[idx++] = 2;
+  result[idx++] = ERL_DRV_TUPLE;
+  result[idx++] = 4;
+
+  fprintf (drv->log, "result: %d, idx: %d\n", result_num, idx);
+  fflush (drv->log);
+
+  drmaa_release_attr_values (rusage);
+
+  int r = driver_output_term (drv->port, result, result_num);
+
+  driver_free (usage);
+  driver_free (result);
+
+  return r;
 }
 
 static int
