@@ -4,7 +4,8 @@
 main (_) ->
   drmaa:start_link (),
   {ok} = drmaa:allocate_job_template (),
-  {ok} = drmaa:remote_command ("sleeper.sh"),
+  {ok, Cwd} = file:get_cwd (), 
+  {ok} = drmaa:remote_command (filename:join ([Cwd, "examples", "sleeper.sh"])),
   {ok} = drmaa:args (["42", "Saymon says: "]),
   {ok} = drmaa:join_files (true),
 
