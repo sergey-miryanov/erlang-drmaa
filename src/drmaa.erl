@@ -113,18 +113,15 @@ handle_call ({delete_job_template}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_DELETE_JOB_TEMPLATE),
   {reply, Reply, State};
 handle_call ({run_job}, _From, #state {port = Port} = State) ->
-  %{ok, JobID} = drmaa:control (Port, ?CMD_RUN_JOB),
-  case drmaa:control (Port, ?CMD_RUN_JOB)
-  of
-    {ok, JobID} -> {reply, {ok, JobID}, State};
-    Other       -> {reply, {unknown, Other}, State}
-  end;
-  %{reply, {ok, JobID}, State};
+  {ok, JobID} = drmaa:control (Port, ?CMD_RUN_JOB),
+  {reply, {ok, JobID}, State};
 handle_call ({remote_command, Command}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_REMOTE_COMMAND, erlang:list_to_binary (Command)),
   {reply, Reply, State};
 handle_call ({v_argv, Argv}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_V_ARGV, erlang:list_to_binary (Argv)),
+  Args = string:join ([erlang:integer_to_list (length (Argv)) | Argv], ","),
+  io:format ("~p~n", [Args]),
+  Reply = drmaa:control (Port, ?CMD_V_ARGV, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.
@@ -139,7 +136,7 @@ control (Port, Command, Data)
     port_control (Port, Command, Data),
     wait_result (Port).
 
-wait_result (Port) ->
+wait_result (_Port) ->
   receive
     {ok, Reply} -> 
       {ok, Reply};

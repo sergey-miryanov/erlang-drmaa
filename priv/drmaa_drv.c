@@ -158,9 +158,9 @@ control (ErlDrvData p,
     SET_ATTR (REMOTE_COMMAND);
     SET_ATTR (START_TIME);
     SET_ATTR (TRANSFER_FILES);
-    //SET_V_ATTR (V_ARGV);
-    //SET_V_ATTR (V_EMAIL);
-    //SET_V_ATTR (V_ENV);
+    SET_V_ATTR (V_ARGV);
+    SET_V_ATTR (V_EMAIL);
+    SET_V_ATTR (V_ENV);
     SET_ATTR (WCT_HLIMIT);
     SET_ATTR (WCT_SLIMIT);
     SET_ATTR (WD);
@@ -197,6 +197,22 @@ send_atom (drmaa_drv_t *drv, char *atom)
   ErlDrvTermData spec[] = {
       ERL_DRV_ATOM, driver_mk_atom (atom),
       ERL_DRV_TUPLE, 1
+  };
+
+  return driver_output_term (drv->port,
+                             spec,
+                             sizeof (spec) / sizeof (spec[0]));
+}
+
+static
+send_error (drmaa_drv_t *drv,
+            char *tag,
+            char *msg)
+{
+  ErlDrvTermData spec[] = {
+      ERL_DRV_ATOM, driver_mk_atom (tag),
+      ERL_DRV_STRING, (ErlDrvTermData)msg, strlen (msg),
+      ERL_DRV_TUPLE, 2
   };
 
   return driver_output_term (drv->port,
@@ -326,8 +342,58 @@ set_attr (drmaa_drv_t *drv,
 static int
 set_vector_attr (drmaa_drv_t *drv,
                  const char *name,
-                 const char *values[],
+                 char *value,
                  int len)
+{
+  value[len] = 0;
+
+  char *count = value;
+  value = strstr (value, ",");
+  if (!value)
+    {
+      fprintf (drv->log, "Command should contain number of items: %s\n", count);
+      fflush (drv->log);
+      return send_error (drv, "error", "Command should contain number of items");
+    }
+  else
+    {
+      ++value;
+    }
+
+  const char **values = (const char **)driver_alloc (sizeof (const char *) * atoi (count) + 1);
+  if (!values)
+    {
+      fprintf (drv->log, "Couldn't allocate memory for values: %d\n", atoi (count));
+      fflush (drv->log);
+      return send_error (drv, "error", "Couldn't allocate memory for values");
+    }
+
+  int idx = 0;
+  char *new_value = 0;
+  while ((new_value = strstr (value, ",")))
+    {
+      values[idx++] = value;
+      new_value[0]  = 0;
+      value         = new_value + 1;
+    }
+
+  if (strlen (value))
+    {
+      values[idx++] = value;
+    }
+
+  values[idx] = 0;
+  int result = set_vector_attr_ (drv, name, values, idx);
+
+  driver_free (values);
+  return result;
+}
+
+static int
+set_vector_attr_ (drmaa_drv_t *drv,
+                  const char *name,
+                  const char **values,
+                  int len)
 {
   drv->err_no = drmaa_set_vector_attribute (drv->job_template,
                                             name,
@@ -339,9 +405,9 @@ set_vector_attr (drmaa_drv_t *drv,
       fprintf (drv->log, "Couldn't set attribute \"%s\": %s\n",
                name,
                drv->err_msg);
-      return 1;
+      return send_error (drv, "error", "Couldn't set attribute");
     }
 
-  return 0;
+  return send_atom (drv, "ok");
 }
 

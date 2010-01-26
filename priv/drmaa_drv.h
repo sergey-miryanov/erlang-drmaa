@@ -66,6 +66,11 @@ static int
 send_atom (drmaa_drv_t *drv,
            char *atom);
 
+static int
+send_error (drmaa_drv_t *drv,
+            char *tag,
+            char *msg);
+
 static void
 ready_async (ErlDrvData drv_data,
              ErlDrvThreadData thread_data);
@@ -117,9 +122,14 @@ set_attr (drmaa_drv_t *drv,
           char *value,
           int len);
 
-static int
+static int 
 set_vector_attr (drmaa_drv_t *drv,
                  const char *name,
-                 const char *value[],
+                 char *value,
                  int len);
+static int
+set_vector_attr_ (drmaa_drv_t *drv,
+                  const char *name,
+                  const char **value,
+                  int len);
 
