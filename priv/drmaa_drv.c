@@ -240,7 +240,26 @@ delete_job_template (drmaa_drv_t *drv,
                      char *command,
                      int len)
 {
-  return 0;
+  if (!drv->job_template)
+    {
+      fprintf (drv->log, "Job template is NULL\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Job template is null, allocate first");
+    }
+
+  drv->err_no = drmaa_delete_job_template (drv->job_template,
+                                           drv->err_msg,
+                                           DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't delete job template: %s\n", drv->err_msg);
+      fflush (drv->log);
+
+      return send_error (drv, "error", drv->err_msg);
+    }
+
+  return send_atom (drv, "ok");
 }
 
 static int
