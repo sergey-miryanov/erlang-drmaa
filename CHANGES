@@ -1,0 +1,13 @@
+Version 0.1 (2010-01-27)
+ - Initial version
+   - Basic operation supports:
+     - Allocate and delete job template
+     - Run single job
+     - Wait for a job
+     - Set remote command
+     - Set command arguments
+     - Set command environment
+     - Set join_files flag
+   - Basic usage examples exist
+     - run_job.erl
+     - wait_job.erl
