@@ -120,7 +120,6 @@ handle_call ({remote_command, Command}, _From, #state {port = Port} = State) ->
   {reply, Reply, State};
 handle_call ({v_argv, Argv}, _From, #state {port = Port} = State) ->
   Args = string:join ([erlang:integer_to_list (length (Argv)) | Argv], ","),
-  io:format ("~p~n", [Args]),
   Reply = drmaa:control (Port, ?CMD_V_ARGV, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
@@ -138,14 +137,7 @@ control (Port, Command, Data)
 
 wait_result (_Port) ->
   receive
-    {ok, Reply} -> 
-      {ok, Reply};
-    {error, Reason} ->
-      io:format("Error: ~p~n", [Reason]),
-      {error, Reason};
-	  Unknown ->
-      io:format("Unknown: ~p~n", [Unknown]),
-	    Unknown
+	  Smth -> Smth
   end.
 
 test (Port) ->

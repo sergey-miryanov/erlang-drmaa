@@ -248,6 +248,14 @@ run_job (drmaa_drv_t *drv,
          char *command,
          int len)
 {
+  if (!drv->job_template)
+    {
+      fprintf (drv->log, "Job template is NULL\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Job template is null, allocate first");
+    }
+
   char job_id[DRMAA_JOBNAME_BUFFER] = {0};
   drv->err_no = drmaa_run_job (job_id,
                                DRMAA_JOBNAME_BUFFER,
@@ -262,9 +270,9 @@ run_job (drmaa_drv_t *drv,
   else
     {
       fprintf (drv->log, "JobID: %s\n", job_id);
+      fflush (drv->log);
     }
 
-  fflush (drv->log);
   ErlDrvTermData spec[] = {
     ERL_DRV_ATOM, driver_mk_atom ("ok"),
     ERL_DRV_STRING, (ErlDrvTermData)job_id, strlen (job_id),
@@ -322,6 +330,14 @@ set_attr (drmaa_drv_t *drv,
           char *value,
           int len)
 {
+  if (!drv->job_template)
+    {
+      fprintf (drv->log, "Job template is NULL\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Job template is null, allocate first");
+    }
+
   value[len] = 0;
   drv->err_no = drmaa_set_attribute (drv->job_template,
                                      name,
@@ -395,6 +411,14 @@ set_vector_attr_ (drmaa_drv_t *drv,
                   const char **values,
                   int len)
 {
+  if (!drv->job_template)
+    {
+      fprintf (drv->log, "Job template is NULL\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Job template is null, allocate first");
+    }
+
   drv->err_no = drmaa_set_vector_attribute (drv->job_template,
                                             name,
                                             values,
