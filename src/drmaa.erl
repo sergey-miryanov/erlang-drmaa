@@ -18,10 +18,12 @@
 %% API
 -export ([allocate_job_template/0, delete_job_template/0]).
 -export ([run_job/0]).
--export ([remote_command/1, v_argv/1]).
+-export ([join_files/1]).
+-export ([remote_command/1, args/1, env/1]).
 
 %% Internal
 -export ([control/2, control/3]).
+-export ([pair_array_to_vector/1]).
 
 -define ('CMD_ALLOCATE_JOB_TEMPLATE',   1).
 -define ('CMD_DELETE_JOB_TEMPLATE',     2).
@@ -68,11 +70,17 @@ delete_job_template () ->
 run_job () ->
   gen_server:call (drmaa, {run_job}).
 
+join_files (Join) when (Join == true) or (Join == false) ->
+  gen_server:call (drmaa, {join_files, Join}).
+
 remote_command (Command) when is_list (Command) ->
   gen_server:call (drmaa, {remote_command, Command}).
 
-v_argv (Argv) when is_list (Argv) ->
-  gen_server:call (drmaa, {v_argv, Argv}).
+args (Argv) when is_list (Argv) ->
+  gen_server:call (drmaa, {args, Argv}).
+
+env (Env) when is_list (Env) ->
+  gen_server:call (drmaa, {env, Env}).
 
 
 %% gen_server callbacks %%
@@ -115,12 +123,21 @@ handle_call ({delete_job_template}, _From, #state {port = Port} = State) ->
 handle_call ({run_job}, _From, #state {port = Port} = State) ->
   {ok, JobID} = drmaa:control (Port, ?CMD_RUN_JOB),
   {reply, {ok, JobID}, State};
+handle_call ({join_files, Join}, _From, #state {port = Port} = State) ->
+  Bin = erlang:list_to_binary (erlang:atom_to_list (Join)),
+  Reply = drmaa:control (Port, ?CMD_JOIN_FILES, Bin),
+  {reply, Reply, State};
 handle_call ({remote_command, Command}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_REMOTE_COMMAND, erlang:list_to_binary (Command)),
   {reply, Reply, State};
-handle_call ({v_argv, Argv}, _From, #state {port = Port} = State) ->
-  Args = string:join ([erlang:integer_to_list (length (Argv)) | Argv], ","),
+handle_call ({args, Argv}, _From, #state {port = Port} = State) ->
+  Args = string:join ([erlang:integer_to_list (length (Argv)), Argv], ","),
   Reply = drmaa:control (Port, ?CMD_V_ARGV, erlang:list_to_binary (Args)),
+  {reply, Reply, State};
+handle_call ({env, Env}, _From, #state {port = Port} = State) ->
+  Buffer = pair_array_to_vector (Env),
+  Args = string:join ([erlang:integer_to_list (length (Env)), Buffer], ","),
+  Reply = drmaa:control (Port, ?CMD_V_ENV, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.
@@ -139,6 +156,13 @@ wait_result (_Port) ->
   receive
 	  Smth -> Smth
   end.
+
+pair_array_to_vector (Array) ->
+  List = lists:map (
+    fun ({Key, Value}) when is_atom (Key) ->
+        string:join ([erlang:atom_to_list (Key), Value], "=") 
+    end, Array),
+  string:join (List, ",").
 
 test (Port) ->
   port_control (Port, 1, <<"xxx">>),
