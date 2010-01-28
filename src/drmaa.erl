@@ -20,7 +20,15 @@
 -export ([run_job/0]).
 -export ([wait/1]).
 -export ([join_files/1]).
--export ([remote_command/1, args/1, env/1]).
+-export ([remote_command/1, args/1, env/1, emails/1]).
+-export ([job_state/1, working_dir/1]).
+-export ([job_name/1]).
+-export ([input_path/1, output_path/1, error_path/1]).
+-export ([job_category/1, native_spec/1]).
+-export ([block_email/1]).
+-export ([start_time/1, deadline_time/1]).
+-export ([hlimit/1, slimit/1, hlimit_duration/1, slimit_duration/1]).
+-export ([transfer_files/1]).
 
 %% Internal
 -export ([control/2, control/3]).
@@ -86,6 +94,62 @@ args (Argv) when is_list (Argv) ->
 env (Env) when is_list (Env) ->
   gen_server:call (drmaa, {env, Env}).
 
+emails (Emails) when is_list (Emails) ->
+  gen_server:call (drmaa, {emails, Emails}).
+
+job_state (active) ->
+  gen_server:call (drmaa, {job_state, "drmaa_active"});
+job_state (hold) ->
+  gen_server:call (drmaa, {job_state, "drmaa_hold"}).
+
+working_dir (Dir) when is_list (Dir) ->
+  gen_server:call (drmaa, {wd, Dir}).
+
+job_name (JobName) when is_list (JobName) ->
+  gen_server:call (drmaa, {job_name, JobName}).
+
+input_path (InputPath) when is_list (InputPath) ->
+  {error, not_supported}.
+  %gen_server:call (drmaa, {input_path, InputPath}).
+
+output_path (OutputPath) when is_list (OutputPath) ->
+  gen_server:call (drmaa, {output_path, OutputPath}).
+
+error_path (ErrorPath) when is_list (ErrorPath) ->
+  gen_server:call (drmaa, {error_path, ErrorPath}).
+
+job_category (_JobCategory) ->
+  {error, not_supported}.
+
+native_spec (_NativeSpec) ->
+  {error, not_supported}.
+
+block_email (true) ->
+  gen_server:call (drmaa, {block_email, "1"});
+block_email (false) ->
+  gen_server:call (drmaa, {block_email, "0"}).
+
+start_time (_StartTime) ->
+  {error, not_supported}.
+
+deadline_time (_DeadlineTime) ->
+  {error, not_supported}.
+
+hlimit (_HLimit) ->
+  {error, not_supported}.
+
+slimit (_SLimit) ->
+  {error, not_supported}.
+
+hlimit_duration (_Duration) ->
+  {error, not_supported}.
+
+slimit_duration (_Duration) ->
+  {error, not_supported}.
+
+transfer_files (List) when is_list (List) ->
+  gen_server:call (drmaa, {transfer_files, List}).
+
 
 %% gen_server callbacks %%
 
@@ -147,6 +211,35 @@ handle_call ({env, Env}, _From, #state {port = Port} = State) ->
   Args = string:join ([erlang:integer_to_list (length (Env)), Buffer], ","),
   Reply = drmaa:control (Port, ?CMD_V_ENV, erlang:list_to_binary (Args)),
   {reply, Reply, State};
+handle_call ({emails, Emails}, _From, #state {port = Port} = State) ->
+  List = string:join ([erlang:integer_to_list (length (Emails)), Emails], ","),
+  Reply = drmaa:control (Port, ?CMD_V_EMAIL, erlang:list_to_binary (List)),
+  {reply, Reply, State};
+handle_call ({job_state, JobState}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_JS_STATE, erlang:list_to_binary (JobState)),
+  {reply, Reply, State};
+handle_call ({wd, WorkingDir}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_WD, erlang:list_to_binary (WorkingDir)),
+  {reply, Reply, State};
+handle_call ({input_path, InputPath}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_INPUT_PATH, erlang:list_to_binary (InputPath)),
+  {reply, Reply, State};
+handle_call ({output_path, OutputPath}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_OUTPUT_PATH, erlang:list_to_binary (OutputPath)),
+  {reply, Reply, State};
+handle_call ({error_path, ErrorPath}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_ERROR_PATH, erlang:list_to_binary (ErrorPath)),
+  {reply, Reply, State};
+handle_call ({block_email, BlockEmail}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_BLOCK_EMAIL, erlang:list_to_binary (BlockEmail)),
+  {reply, Reply, State};
+handle_call ({transfer_files, List}, _From, #state {port = Port} = State) ->
+  TF = list_to_transfer_files (List),
+  Reply = drmaa:control (Port, ?CMD_TRANSFER_FILES, erlang:list_to_binary (TF)),
+  {reply, Reply, State};
+handle_call ({job_name, JobName}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_JOB_NAME, erlang:list_to_binary (JobName)),
+  {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.
 
@@ -171,6 +264,15 @@ pair_array_to_vector (Array) ->
         string:join ([erlang:atom_to_list (Key), Value], "=") 
     end, Array),
   string:join (List, ",").
+
+list_to_transfer_files (List) ->
+  list_to_transfer_files (List, []).
+%list_to_transfer_files ([input  | Tail], TF) -> list_to_transfer_files (Tail, ["i" | TF]);
+list_to_transfer_files ([input  | Tail], TF) -> list_to_transfer_files (Tail, TF);
+list_to_transfer_files ([error  | Tail], TF) -> list_to_transfer_files (Tail, ["e" | TF]);
+list_to_transfer_files ([output | Tail], TF) -> list_to_transfer_files (Tail, ["o" | TF]);
+list_to_transfer_files ([], TF) ->
+  TF.
 
 test (Port) ->
   port_control (Port, 1, <<"xxx">>),

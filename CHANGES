@@ -1,3 +1,14 @@
+Version 0.2 (2010-01-28)
+ - Implemented Erlang wrappers
+   - block_email
+   - error_path
+   - job_name
+   - job_state
+   - output_path
+   - transfer_files
+   - emails
+   - working_dir
+
 Version 0.1 (2010-01-27)
  - Initial version
    - Basic operation supports:

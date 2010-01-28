@@ -5,23 +5,15 @@
    - Implement job_ps
   
 - Erlang:
-   - Implement block_email
    - Implement deadline_time
-   - Implement duration_hlimit
-   - Implement duration_slimit
-   - Implement error_path
+   - Implement hlimit_duration (DRMAA_DURATION_HLIMIT)
+   - Implement slimit_duration (DRMAA_DURATION_SLIMIT)
    - Implement input_path
    - Implement job_category
-   - Implement job_name
-   - Implement js_state
    - Implement native_spec (DRMAA_NATIVE_SPECIFICATION)
-   - Implement output_path
    - Implement start_time
-   - Implement transfer_files
-   - Implement emails
-   - Implement (?) wct_hlimit
-   - Implement (?) wct_slimit
-   - Implement (?) wd
+   - Implement hlimit (DRMAA_WCT_HLIMIT)
+   - Implement slimit (DRMAA_WCT_SLIMIT)
   
 - Documentation
 - Examples

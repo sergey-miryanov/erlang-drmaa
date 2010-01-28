@@ -16,3 +16,4 @@ run:
 ex:
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/run_job.erl
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/wait_job.erl
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/attrs.erl
