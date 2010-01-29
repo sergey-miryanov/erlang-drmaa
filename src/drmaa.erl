@@ -245,13 +245,18 @@ handle_call (Request, _From, State) ->
 
 
 control (Port, Command) when is_port (Port) and is_integer (Command) ->
-  port_control (Port, Command, <<>>),
+  port_control (Port, Command, <<"_">>),
   wait_result (Port).
 
 control (Port, Command, Data) 
   when is_port (Port) and is_integer (Command) and is_binary (Data) ->
     port_control (Port, Command, Data),
+    wait_result (Port);
+control (Port, Command, <<>>)
+  when is_port (Port) and is_integer (Command) ->
+    port_control (Port, Command, <<"_">>),
     wait_result (Port).
+
 
 wait_result (_Port) ->
   receive

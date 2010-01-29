@@ -112,9 +112,10 @@ control (ErlDrvData p,
          int rlen)
 {
   drmaa_drv_t *drv = (drmaa_drv_t *) (p);
+  buf[len] = 0;
 
+  fprintf (drv->log, "cmd: %d\n", command);
   fprintf (drv->log, "buf/%d: %s\n", len, buf);
-  fprintf (drv->log, "rbuf/%d: %s\n", rlen, *rbuf);
   fflush (drv->log);
 
   switch (command)
@@ -229,6 +230,7 @@ allocate_job_template (drmaa_drv_t *drv,
   if (is_error (drv->err_no))
     {
       fprintf (drv->log, "Couldn't allocate job template: %s\n", drv->err_msg);
+      fflush (drv->log);
       return send_atom (drv, "error");
     }
 
