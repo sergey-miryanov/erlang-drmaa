@@ -1,5 +1,4 @@
 - Driver:
-   - Implement run_bulk_jobs
    - Implement synchronize
    - Implement control_drmaa
    - Implement job_ps
