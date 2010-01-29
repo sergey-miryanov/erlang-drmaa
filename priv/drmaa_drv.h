@@ -32,6 +32,9 @@
 #define CMD_WCT_HLIMIT              27
 #define CMD_WCT_SLIMIT              28
 #define CMD_WD                      29
+#define CMD_PLACEHOLDER_HD          30
+#define CMD_PLACEHOLDER_WD          31
+#define CMD_PLACEHOLDER_INCR        32
 
 typedef struct drmaa_drv_t {
   char                  err_msg[DRMAA_ERROR_STRING_BUFFER];
@@ -133,3 +136,6 @@ set_vector_attr_ (drmaa_drv_t *drv,
                   const char **value,
                   int len);
 
+static int
+send_placeholder (drmaa_drv_t *drv,
+                  const char *placeholder);

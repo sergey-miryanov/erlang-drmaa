@@ -165,6 +165,15 @@ control (ErlDrvData p,
     SET_ATTR (WCT_HLIMIT);
     SET_ATTR (WCT_SLIMIT);
     SET_ATTR (WD);
+    case CMD_PLACEHOLDER_HD:
+      send_placeholder (drv, DRMAA_PLACEHOLDER_HD);
+      break;
+    case CMD_PLACEHOLDER_WD:
+      send_placeholder (drv, DRMAA_PLACEHOLDER_WD);
+      break;
+    case CMD_PLACEHOLDER_INCR:
+      send_placeholder (drv, DRMAA_PLACEHOLDER_INCR);
+      break;
     default:
       unknown (drv, buf, len);
       break;
@@ -616,3 +625,14 @@ set_vector_attr_ (drmaa_drv_t *drv,
   return send_atom (drv, "ok");
 }
 
+static int
+send_placeholder (drmaa_drv_t *drv, const char *placeholder)
+{
+  ErlDrvTermData result[] = {
+      ERL_DRV_STRING, (ErlDrvTermData)placeholder, strlen (placeholder)
+  };
+
+  return driver_output_term (drv->port,
+                             result,
+                             sizeof (result) / sizeof (result[0]));
+}

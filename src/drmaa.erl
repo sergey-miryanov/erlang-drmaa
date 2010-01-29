@@ -29,6 +29,7 @@
 -export ([start_time/1, deadline_time/1]).
 -export ([hlimit/1, slimit/1, hlimit_duration/1, slimit_duration/1]).
 -export ([transfer_files/1]).
+-export ([placeholder/1]).
 
 %% Internal
 -export ([control/2, control/3]).
@@ -63,6 +64,9 @@
 -define ('CMD_WCT_HLIMIT',              27).
 -define ('CMD_WCT_SLIMIT',              28).
 -define ('CMD_WD',                      29).
+-define ('CMD_PLACEHOLDER_HD',          30).
+-define ('CMD_PLACEHOLDER_WD',          31).
+-define ('CMD_PLACEHOLDER_INCR',        32).
 
 -record (state, {port, ops = []}).
 
@@ -149,6 +153,19 @@ slimit_duration (_Duration) ->
 
 transfer_files (List) when is_list (List) ->
   gen_server:call (drmaa, {transfer_files, List}).
+
+placeholder (incr) ->
+  gen_server:call (drmaa, {placeholder_incr});
+placeholder (hd) ->
+  gen_server:call (drmaa, {placeholder_hd});
+placeholder (home) ->
+  gen_server:call (drmaa, {placeholder_hd});
+placeholder (home_dir) ->
+  gen_server:call (drmaa, {placeholder_hd});
+placeholder (wd) ->
+  gen_server:call (drmaa, {placeholder_wd});
+placeholder (working_dir) ->
+  gen_server:call (drmaa, {placeholder_wd}).
 
 
 %% gen_server callbacks %%
@@ -239,6 +256,15 @@ handle_call ({transfer_files, List}, _From, #state {port = Port} = State) ->
   {reply, Reply, State};
 handle_call ({job_name, JobName}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_JOB_NAME, erlang:list_to_binary (JobName)),
+  {reply, Reply, State};
+handle_call ({placeholder_hd}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_HD),
+  {reply, Reply, State};
+handle_call ({placeholder_wd}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_WD),
+  {reply, Reply, State};
+handle_call ({placeholder_incr}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_INCR),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.
