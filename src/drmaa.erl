@@ -17,7 +17,7 @@
 
 %% API
 -export ([allocate_job_template/0, delete_job_template/0]).
--export ([run_job/0]).
+-export ([run_job/0, run_jobs/3, run_jobs/1]).
 -export ([wait/1]).
 -export ([join_files/1]).
 -export ([remote_command/1, args/1, env/1, emails/1]).
@@ -82,6 +82,16 @@ delete_job_template () ->
 
 run_job () ->
   gen_server:call (drmaa, {run_job}).
+
+run_jobs (Start, End, Incr) when is_integer (Start) 
+                             and is_integer (End)
+                             and is_integer (Incr) 
+                             and (Start > 0) 
+                             and (Start =< End) 
+                             and (End =< 2147483647) ->
+  gen_server:call (drmaa, {run_jobs, Start, End, Incr}).
+run_jobs (Count) when is_integer (Count) and (Count > 0) ->
+  gen_server:call (drmaa, {run_jobs, 1, Count, 1}).
 
 wait (JobID) when is_list (JobID) ->
   gen_server:call (drmaa, {wait, JobID}).
@@ -263,6 +273,11 @@ handle_call ({transfer_files, List}, _From, #state {port = Port} = State) ->
   {reply, Reply, State};
 handle_call ({job_name, JobName}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_JOB_NAME, erlang:list_to_binary (JobName)),
+  {reply, Reply, State};
+handle_call ({run_jobs, Start, End, Incr}, _From, #state {port = Port} = State) ->
+  List = [erlang:integer_to_list (Start), erlang:integer_to_list (End), erlang:integer_to_list (Incr)],
+  Buffer = erlang:list_to_binary (string:join (List, ",")),
+  Reply = drmaa:control (Port, ?CMD_RUN_BULK_JOBS, Buffer),
   {reply, Reply, State};
 handle_call ({placeholder_hd}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_HD),

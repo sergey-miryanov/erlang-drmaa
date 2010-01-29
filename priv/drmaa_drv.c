@@ -240,6 +240,7 @@ allocate_job_template (drmaa_drv_t *drv,
     {
       fprintf (drv->log, "Couldn't allocate job template: %s\n", drv->err_msg);
       fflush (drv->log);
+
       return send_atom (drv, "error");
     }
 
@@ -319,7 +320,146 @@ run_bulk_jobs (drmaa_drv_t *drv,
                char *command,
                int len)
 {
-  return 0;
+  if (!drv->job_template)
+    {
+      fprintf (drv->log, "Job template is NULL\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Job template is null, allocate first");
+    }
+
+  char *start = command;
+  char *end = strstr (start, ",");
+  if (!end)
+    {
+      fprintf (drv->log, "Invalid command: %s\n", command);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Invalid command buffer");
+    }
+
+  char *incr = strstr (end + 1, ",");
+  if (!incr)
+    {
+      fprintf (drv->log, "Invalid command: %s\n", command);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Invalid command buffer");
+    }
+
+  drmaa_job_ids_t *jobs = NULL;
+  drv->err_no = drmaa_run_bulk_jobs (&jobs,
+                                     drv->job_template,
+                                     atoi (start),
+                                     atoi (end + 1),
+                                     atoi (incr + 1),
+                                     drv->err_msg,
+                                     DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't run bulk of jobs: %s\n", drv->err_msg);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Couldn't run bulk of jobs");
+    }
+
+  ErlDrvTermData *result = (ErlDrvTermData *)driver_alloc (sizeof (ErlDrvTermData) * 2);
+  if (!result)
+    {
+      fprintf (drv->log, "Couldn't allocate memory for result\n");
+      fflush (drv->log);
+
+      drmaa_release_job_ids (jobs);
+      return send_error (drv, "error", "Couldn't allocate memory for result");
+    }
+
+  size_t result_idx = 0;
+  result[result_idx++] = ERL_DRV_ATOM;
+  result[result_idx++] = driver_mk_atom ("ok");
+
+  char job [DRMAA_JOBNAME_BUFFER] = {0};
+  size_t job_count = 0;
+  for (;; ++job_count)
+    {
+      drv->err_no = drmaa_get_next_job_id (jobs, job, DRMAA_JOBNAME_BUFFER);
+      if (is_error (drv->err_no))
+        {
+          if (drv->err_no == DRMAA_ERRNO_NO_MORE_ELEMENTS)
+            break;
+          else
+            {
+              fprintf (drv->log, "Couldn't get next job id: %d\n", drv->err_no);
+              fflush (drv->log);
+
+              drmaa_release_job_ids (jobs);
+              driver_free (result);
+
+              return send_error (drv, "error", "Couldn't get next job id");
+            }
+        }
+
+      result = (ErlDrvTermData *) driver_realloc (result, sizeof (*result) * (result_idx + 3));
+      if (!result)
+        {
+          fprintf (drv->log, "Couldn't realloc memory for result\n");
+          fflush (drv->log);
+
+          drmaa_release_job_ids (jobs);
+
+          return send_error (drv, "error", "Couldn't reallocate memory for result");
+        }
+
+      size_t job_id_len = strlen (job);
+      char *job_id = (char *) driver_alloc (sizeof (char) * (job_id_len + 1));
+      if (!job_id)
+        {
+          fprintf (drv->log, "Couldn't allocate memory for job id: %d\n", job_count);
+          fflush (drv->log);
+
+          driver_free (result);
+          drmaa_release_job_ids (jobs);
+
+          return send_error (drv, "error", "Couldn't allocate memory for job id");
+        }
+
+      memcpy (job_id, job, job_id_len + 1);
+
+      result[result_idx++] = ERL_DRV_STRING;
+      result[result_idx++] = (ErlDrvTermData)job_id;
+      result[result_idx++] = job_id_len;
+    }
+
+  result = (ErlDrvTermData *) driver_realloc (result, sizeof (*result) * (result_idx + 5));
+  if (!result)
+    {
+      fprintf (drv->log, "Couldn't reallocate memory for result\n");
+      fflush (drv->log);
+
+      drmaa_release_job_ids (jobs);
+
+      return send_error (drv, "error", "Couldn't reallocate memory for result");
+    }
+
+  result[result_idx++] = ERL_DRV_NIL;
+  result[result_idx++] = ERL_DRV_LIST;
+  result[result_idx++] = job_count + 1;
+  result[result_idx++] = ERL_DRV_TUPLE;
+  result[result_idx++] = 2;
+
+  int r = driver_output_term (drv->port,
+                              result, result_idx);
+
+  size_t idx = 0;
+  for (; idx < result_idx; ++idx)
+    {
+      if (result[idx] == ERL_DRV_STRING)
+        driver_free ((char *)result[idx + 1]);
+    }
+
+  driver_free (result);
+  drmaa_release_job_ids (jobs);
+
+  return r;
 }
 
 static int
