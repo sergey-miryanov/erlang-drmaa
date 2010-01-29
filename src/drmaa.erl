@@ -221,17 +221,23 @@ handle_call ({remote_command, Command}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_REMOTE_COMMAND, erlang:list_to_binary (Command)),
   {reply, Reply, State};
 handle_call ({args, Argv}, _From, #state {port = Port} = State) ->
-  Args = string:join ([erlang:integer_to_list (length (Argv)), Argv], ","),
-  Reply = drmaa:control (Port, ?CMD_V_ARGV, erlang:list_to_binary (Args)),
+  Len = length (Argv),
+  List = [erlang:integer_to_list (Len) | Argv],
+  Args = string:join (List, ","),
+  Reply = drmaa:control (Port, ?CMD_V_ARGV, erlang:list_to_binary (lists:flatten (Args))),
   {reply, Reply, State};
 handle_call ({env, Env}, _From, #state {port = Port} = State) ->
   Buffer = pair_array_to_vector (Env),
-  Args = string:join ([erlang:integer_to_list (length (Env)), Buffer], ","),
+  Len = length (Env),
+  List = [erlang:integer_to_list (Len) | Buffer],
+  Args = string:join (List, ","),
   Reply = drmaa:control (Port, ?CMD_V_ENV, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call ({emails, Emails}, _From, #state {port = Port} = State) ->
-  List = string:join ([erlang:integer_to_list (length (Emails)), Emails], ","),
-  Reply = drmaa:control (Port, ?CMD_V_EMAIL, erlang:list_to_binary (List)),
+  Len = length (Emails),
+  List = [erlang:integer_to_list (Len) | Emails],
+  Args = string:join (List, ","),
+  Reply = drmaa:control (Port, ?CMD_V_EMAIL, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call ({job_state, JobState}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_JS_STATE, erlang:list_to_binary (JobState)),
