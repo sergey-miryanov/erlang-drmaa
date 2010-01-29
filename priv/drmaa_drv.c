@@ -553,7 +553,13 @@ set_vector_attr (drmaa_drv_t *drv,
 {
   value[len] = 0;
 
-  char *count = value;
+  size_t count = atoi (value);
+  if (!count)
+    {
+      const char *values[] = {0};
+      return set_vector_attr_ (drv, name, values, 0);
+    }
+
   value = strstr (value, ",");
   if (!value)
     {
@@ -566,10 +572,10 @@ set_vector_attr (drmaa_drv_t *drv,
       ++value;
     }
 
-  const char **values = (const char **)driver_alloc (sizeof (const char *) * atoi (count) + 1);
+  const char **values = (const char **)driver_alloc (sizeof (const char *) * (count + 1));
   if (!values)
     {
-      fprintf (drv->log, "Couldn't allocate memory for values: %d\n", atoi (count));
+      fprintf (drv->log, "Couldn't allocate memory for values: %d\n", count);
       fflush (drv->log);
       return send_error (drv, "error", "Couldn't allocate memory for values");
     }
