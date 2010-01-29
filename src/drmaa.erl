@@ -86,8 +86,10 @@ run_job () ->
 wait (JobID) when is_list (JobID) ->
   gen_server:call (drmaa, {wait, JobID}).
 
-join_files (Join) when (Join == true) or (Join == false) ->
-  gen_server:call (drmaa, {join_files, Join}).
+join_files (true) ->
+  gen_server:call (drmaa, {join_files, "y"});
+join_files (false) ->
+  gen_server:call (drmaa, {join_files, "n"}).
 
 remote_command (Command) when is_list (Command) ->
   gen_server:call (drmaa, {remote_command, Command}).
@@ -213,8 +215,7 @@ handle_call ({wait, JobID}, _From, #state {port = Port} = State) ->
     = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (JobID)),
   {reply, {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}}, State};
 handle_call ({join_files, Join}, _From, #state {port = Port} = State) ->
-  Bin = erlang:list_to_binary (erlang:atom_to_list (Join)),
-  Reply = drmaa:control (Port, ?CMD_JOIN_FILES, Bin),
+  Reply = drmaa:control (Port, ?CMD_JOIN_FILES, erlang:list_to_binary (Join)),
   {reply, Reply, State};
 handle_call ({remote_command, Command}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_REMOTE_COMMAND, erlang:list_to_binary (Command)),
