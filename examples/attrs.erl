@@ -28,7 +28,7 @@ main (_) ->
   {ok}                    = drmaa:working_dir ("/home/zerg/works/drmaa/examples"),
   {ok}                    = drmaa:join_files (false),
   {ok}                    = drmaa:remote_command ("sleeper.sh"),
-  {ok}                    = drmaa:args (["42", "Saymon says: "]),
+  {ok}                    = drmaa:args (["42", "Saymon says: ", "3s"]),
   {ok}                    = drmaa:env ([]),
 
   {ok, JobID} = drmaa:run_job (),

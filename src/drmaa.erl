@@ -19,6 +19,7 @@
 -export ([allocate_job_template/0, delete_job_template/0]).
 -export ([run_job/0, run_jobs/3, run_jobs/1]).
 -export ([wait/2, synchronize/2]).
+-export ([control/2]).
 -export ([join_files/1]).
 -export ([remote_command/1, args/1, env/1, emails/1]).
 -export ([job_state/1, working_dir/1]).
@@ -32,9 +33,10 @@
 -export ([placeholder/1]).
 -export ([job_ids/1]).
 -export ([timeout/1]).
+-export ([control_tag/1]).
 
 %% Internal
--export ([control/2, control/3]).
+-export ([control_drv/2, control_drv/3]).
 -export ([pair_array_to_vector/1]).
 
 -define ('CMD_ALLOCATE_JOB_TEMPLATE',   1).
@@ -73,6 +75,11 @@
 -define ('CMD_JOB_IDS_SESSION_ANY',     34).
 -define ('CMD_TIMEOUT_FOREVER',         35).
 -define ('CMD_TIMEOUT_NO_WAIT',         36).
+-define ('CMD_CONTROL_SUSPEND',         37).
+-define ('CMD_CONTROL_RESUME',          38).
+-define ('CMD_CONTROL_HOLD',            39).
+-define ('CMD_CONTROL_RELEASE',         40).
+-define ('CMD_CONTROL_TERMINATE',       41).
 
 -record (state, {port, ops = []}).
 
@@ -114,6 +121,15 @@ synchronize (Jobs, no_wait) when is_list (Jobs) ->
   gen_server:call (drmaa, {sync, Jobs, timeout (no_wait)}, 1000);
 synchronize (Jobs, Timeout) when is_list (Jobs) and is_integer (Timeout) ->
   gen_server:call (drmaa, {sync, Jobs, Timeout}, Timeout * 2).
+
+control (all, Action)     -> control_inner (job_ids (all), Action);
+control (JobID, Action)   -> control_inner (JobID, Action).
+
+control_inner (JobID, suspend)    -> gen_server:call (drmaa, {control, control_tag (suspend),   JobID});
+control_inner (JobID, resume)     -> gen_server:call (drmaa, {control, control_tag (resume),    JobID});
+control_inner (JobID, hold)       -> gen_server:call (drmaa, {control, control_tag (hold),      JobID});
+control_inner (JobID, release)    -> gen_server:call (drmaa, {control, control_tag (release),   JobID});
+control_inner (JobID, terminate)  -> gen_server:call (drmaa, {control, control_tag (terminate), JobID}). 
 
 join_files (true) ->
   gen_server:call (drmaa, {join_files, "y"});
@@ -208,6 +224,12 @@ timeout (forever) ->
 timeout (no_wait) ->
   gen_server:call (drmaa, {timeout, no_wait}).
 
+control_tag (suspend)   -> gen_server:call (drmaa, {control_tag, suspend});
+control_tag (resume)    -> gen_server:call (drmaa, {control_tag, resume});
+control_tag (hold)      -> gen_server:call (drmaa, {control_tag, hold});
+control_tag (release)   -> gen_server:call (drmaa, {control_tag, release});
+control_tag (terminate) -> gen_server:call (drmaa, {control_tag, terminate}).
+
 %% gen_server callbacks %%
 
 init ([]) ->
@@ -240,113 +262,128 @@ terminate (_Reason, _State) ->
   ok.
 
 handle_call ({allocate_job_template}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_ALLOCATE_JOB_TEMPLATE),
+  Reply = drmaa:control_drv (Port, ?CMD_ALLOCATE_JOB_TEMPLATE),
   {reply, Reply, State};
 handle_call ({delete_job_template}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_DELETE_JOB_TEMPLATE),
+  Reply = drmaa:control_drv (Port, ?CMD_DELETE_JOB_TEMPLATE),
   {reply, Reply, State};
 handle_call ({run_job}, _From, #state {port = Port} = State) ->
-  {ok, JobID} = drmaa:control (Port, ?CMD_RUN_JOB),
+  {ok, JobID} = drmaa:control_drv (Port, ?CMD_RUN_JOB),
   {reply, {ok, JobID}, State};
 handle_call ({wait, JobID, Timeout}, _From, #state {port = Port} = State) ->
   Args = string:join ([erlang:integer_to_list (Timeout) | [JobID]], ","),
-  Reply = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (Args)),
+  Reply = drmaa:control_drv (Port, ?CMD_WAIT, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call ({sync, Jobs, Timeout}, _From, #state { port = Port} = State) ->
   Len = length (Jobs),
   List = [erlang:integer_to_list (Len) | sync_jobs_to_list (Port, Jobs)],
   Args = string:join ([erlang:integer_to_list (Timeout) | List], ","),
-  Reply = drmaa:control (Port, ?CMD_SYNCHRONIZE, erlang:list_to_binary (Args)),
+  Reply = drmaa:control_drv (Port, ?CMD_SYNCHRONIZE, erlang:list_to_binary (Args)),
+  {reply, Reply, State};
+handle_call ({control, Action, JobID}, _From, #state {port = Port} = State) ->
+  Reply = control_impl (Port, Action, JobID),
   {reply, Reply, State};
 handle_call ({join_files, Join}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_JOIN_FILES, erlang:list_to_binary (Join)),
+  Reply = drmaa:control_drv (Port, ?CMD_JOIN_FILES, erlang:list_to_binary (Join)),
   {reply, Reply, State};
 handle_call ({remote_command, Command}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_REMOTE_COMMAND, erlang:list_to_binary (Command)),
+  Reply = drmaa:control_drv (Port, ?CMD_REMOTE_COMMAND, erlang:list_to_binary (Command)),
   {reply, Reply, State};
 handle_call ({args, Argv}, _From, #state {port = Port} = State) ->
   Len = length (Argv),
   List = [erlang:integer_to_list (Len) | Argv],
   Args = string:join (List, ","),
-  Reply = drmaa:control (Port, ?CMD_V_ARGV, erlang:list_to_binary (lists:flatten (Args))),
+  Reply = drmaa:control_drv (Port, ?CMD_V_ARGV, erlang:list_to_binary (lists:flatten (Args))),
   {reply, Reply, State};
 handle_call ({env, Env}, _From, #state {port = Port} = State) ->
   Buffer = pair_array_to_vector (Env),
   Len = length (Env),
   List = [erlang:integer_to_list (Len) | Buffer],
   Args = string:join (List, ","),
-  Reply = drmaa:control (Port, ?CMD_V_ENV, erlang:list_to_binary (Args)),
+  Reply = drmaa:control_drv (Port, ?CMD_V_ENV, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call ({emails, Emails}, _From, #state {port = Port} = State) ->
   Len = length (Emails),
   List = [erlang:integer_to_list (Len) | Emails],
   Args = string:join (List, ","),
-  Reply = drmaa:control (Port, ?CMD_V_EMAIL, erlang:list_to_binary (Args)),
+  Reply = drmaa:control_drv (Port, ?CMD_V_EMAIL, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call ({job_state, JobState}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_JS_STATE, erlang:list_to_binary (JobState)),
+  Reply = drmaa:control_drv (Port, ?CMD_JS_STATE, erlang:list_to_binary (JobState)),
   {reply, Reply, State};
 handle_call ({wd, WorkingDir}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_WD, erlang:list_to_binary (WorkingDir)),
+  Reply = drmaa:control_drv (Port, ?CMD_WD, erlang:list_to_binary (WorkingDir)),
   {reply, Reply, State};
 handle_call ({input_path, InputPath}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_INPUT_PATH, erlang:list_to_binary (InputPath)),
+  Reply = drmaa:control_drv (Port, ?CMD_INPUT_PATH, erlang:list_to_binary (InputPath)),
   {reply, Reply, State};
 handle_call ({output_path, OutputPath}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_OUTPUT_PATH, erlang:list_to_binary (OutputPath)),
+  Reply = drmaa:control_drv (Port, ?CMD_OUTPUT_PATH, erlang:list_to_binary (OutputPath)),
   {reply, Reply, State};
 handle_call ({error_path, ErrorPath}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_ERROR_PATH, erlang:list_to_binary (ErrorPath)),
+  Reply = drmaa:control_drv (Port, ?CMD_ERROR_PATH, erlang:list_to_binary (ErrorPath)),
   {reply, Reply, State};
 handle_call ({block_email, BlockEmail}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_BLOCK_EMAIL, erlang:list_to_binary (BlockEmail)),
+  Reply = drmaa:control_drv (Port, ?CMD_BLOCK_EMAIL, erlang:list_to_binary (BlockEmail)),
   {reply, Reply, State};
 handle_call ({transfer_files, List}, _From, #state {port = Port} = State) ->
   TF = list_to_transfer_files (List),
-  Reply = drmaa:control (Port, ?CMD_TRANSFER_FILES, erlang:list_to_binary (TF)),
+  Reply = drmaa:control_drv (Port, ?CMD_TRANSFER_FILES, erlang:list_to_binary (TF)),
   {reply, Reply, State};
 handle_call ({job_name, JobName}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_JOB_NAME, erlang:list_to_binary (JobName)),
+  Reply = drmaa:control_drv (Port, ?CMD_JOB_NAME, erlang:list_to_binary (JobName)),
   {reply, Reply, State};
 handle_call ({run_jobs, Start, End, Incr}, _From, #state {port = Port} = State) ->
   List = [erlang:integer_to_list (Start), erlang:integer_to_list (End), erlang:integer_to_list (Incr)],
   Buffer = erlang:list_to_binary (string:join (List, ",")),
-  Reply = drmaa:control (Port, ?CMD_RUN_BULK_JOBS, Buffer),
+  Reply = drmaa:control_drv (Port, ?CMD_RUN_BULK_JOBS, Buffer),
   {reply, Reply, State};
 handle_call ({placeholder_hd}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_HD),
+  Reply = drmaa:control_drv (Port, ?CMD_PLACEHOLDER_HD),
   {reply, Reply, State};
 handle_call ({placeholder_wd}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_WD),
+  Reply = drmaa:control_drv (Port, ?CMD_PLACEHOLDER_WD),
   {reply, Reply, State};
 handle_call ({placeholder_incr}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_INCR),
+  Reply = drmaa:control_drv (Port, ?CMD_PLACEHOLDER_INCR),
   {reply, Reply, State};
 handle_call ({job_ids_all}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_JOB_IDS_SESSION_ALL),
+  Reply = drmaa:control_drv (Port, ?CMD_JOB_IDS_SESSION_ALL),
   {reply, Reply, State};
 handle_call ({job_ids_any}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_JOB_IDS_SESSION_ANY),
+  Reply = drmaa:control_drv (Port, ?CMD_JOB_IDS_SESSION_ANY),
   {reply, Reply, State};
 handle_call ({timeout, forever}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_TIMEOUT_FOREVER),
+  Reply = drmaa:control_drv (Port, ?CMD_TIMEOUT_FOREVER),
   {reply, Reply, State};
 handle_call ({timeout, no_wait}, _From, #state {port = Port} = State) ->
-  Reply = drmaa:control (Port, ?CMD_TIMEOUT_NO_WAIT),
+  Reply = drmaa:control_drv (Port, ?CMD_TIMEOUT_NO_WAIT),
+  {reply, Reply, State};
+handle_call ({control_tag, Tag}, _From, #state {port = Port} = State) ->
+  Reply = control_tag_impl (Port, Tag),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.
 
+control_tag_impl (Port, suspend)   -> drmaa:control_drv (Port, ?CMD_CONTROL_SUSPEND);
+control_tag_impl (Port, resume)    -> drmaa:control_drv (Port, ?CMD_CONTROL_RESUME);
+control_tag_impl (Port, hold)      -> drmaa:control_drv (Port, ?CMD_CONTROL_HOLD);
+control_tag_impl (Port, release)   -> drmaa:control_drv (Port, ?CMD_CONTROL_RELEASE);
+control_tag_impl (Port, terminate) -> drmaa:control_drv (Port, ?CMD_CONTROL_TERMINATE).
 
-control (Port, Command) when is_port (Port) and is_integer (Command) ->
+control_impl (Port, Action, JobID) ->
+  Args = string:join ([erlang:integer_to_list (Action) | [JobID]], ","),
+  drmaa:control_drv (Port, ?CMD_CONTROL, erlang:list_to_binary (Args)).
+
+control_drv (Port, Command) when is_port (Port) and is_integer (Command) ->
   port_control (Port, Command, <<"_">>),
   wait_result (Port).
 
-control (Port, Command, Data) 
+control_drv (Port, Command, Data) 
   when is_port (Port) and is_integer (Command) and is_binary (Data) ->
     port_control (Port, Command, Data),
     wait_result (Port);
-control (Port, Command, <<>>)
+control_drv (Port, Command, <<>>)
   when is_port (Port) and is_integer (Command) ->
     port_control (Port, Command, <<"_">>),
     wait_result (Port).
@@ -376,7 +413,7 @@ list_to_transfer_files ([], TF) ->
 sync_jobs_to_list (Port, Jobs) ->
   sync_jobs_to_list (Port, Jobs, []).
 sync_jobs_to_list (Port, [all | Tail], List) -> 
-  sync_jobs_to_list (Port, Tail, [drmaa:control (Port, ?CMD_JOB_IDS_SESSION_ALL) | List]);
+  sync_jobs_to_list (Port, Tail, [drmaa:control_drv (Port, ?CMD_JOB_IDS_SESSION_ALL) | List]);
 sync_jobs_to_list (Port, [H   | Tail], List) -> 
   sync_jobs_to_list (Port, Tail, [H | List]);
 sync_jobs_to_list (_Port, [], List) ->

@@ -39,6 +39,11 @@
 #define CMD_JOB_IDS_SESSION_ANY     34
 #define CMD_TIMEOUT_FOREVER         35
 #define CMD_TIMEOUT_NO_WAIT         36
+#define CMD_CONTROL_SUSPEND         37
+#define CMD_CONTROL_RESUME          38
+#define CMD_CONTROL_HOLD            39
+#define CMD_CONTROL_RELEASE         40
+#define CMD_CONTROL_TERMINATE       41
 
 typedef struct drmaa_drv_t {
   char                  err_msg[DRMAA_ERROR_STRING_BUFFER];
@@ -149,5 +154,4 @@ send_job_ids_session (drmaa_drv_t *drv,
                       const char *job_id_session);
 
 static int
-send_timeout (drmaa_drv_t *drv,
-              long timeout);
+send_int (drmaa_drv_t *drv, long timeout);

@@ -11,7 +11,7 @@ main (_) ->
   {ok} = drmaa:working_dir ("/home/zerg/works/drmaa/examples"),
   {ok} = drmaa:join_files (true),
   {ok} = drmaa:remote_command ("/home/zerg/works/drmaa/examples/sleeper.sh"),
-  {ok} = drmaa:args (["42", "Saymon says: "]),
+  {ok} = drmaa:args (["42", "Saymon says: ", "3s"]),
   OutputPath ="/home/zerg/works/drmaa/bulk_jobs.out." ++ drmaa:placeholder (incr),
   io:format ("~p~n", [OutputPath]),
   {ok} = drmaa:output_path (OutputPath),

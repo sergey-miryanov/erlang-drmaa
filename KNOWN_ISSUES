@@ -1,2 +1,4 @@
 - SISEGV occured while job starting if drmaa:transfer_files ([input]) called
 - drmaa:wait (any) works for jobs in current session only (by DRMAA design)
+- If ./examples/control.erl ran at the end of list of examples DRMAA returns 
+  error

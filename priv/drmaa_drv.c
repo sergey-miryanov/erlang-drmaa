@@ -177,9 +177,19 @@ control (ErlDrvData p,
     case CMD_JOB_IDS_SESSION_ANY:
       return send_job_ids_session (drv, DRMAA_JOB_IDS_SESSION_ANY);
     case CMD_TIMEOUT_FOREVER:
-      return send_timeout (drv, DRMAA_TIMEOUT_WAIT_FOREVER);
+      return send_int (drv, DRMAA_TIMEOUT_WAIT_FOREVER);
     case CMD_TIMEOUT_NO_WAIT:
-      return send_timeout (drv, DRMAA_TIMEOUT_NO_WAIT);
+      return send_int (drv, DRMAA_TIMEOUT_NO_WAIT);
+    case CMD_CONTROL_SUSPEND:
+      return send_int (drv, DRMAA_CONTROL_SUSPEND);
+    case CMD_CONTROL_RESUME:
+      return send_int (drv, DRMAA_CONTROL_RESUME);
+    case CMD_CONTROL_HOLD:
+      return send_int (drv, DRMAA_CONTROL_HOLD);
+    case CMD_CONTROL_RELEASE:
+      return send_int (drv, DRMAA_CONTROL_RELEASE);
+    case CMD_CONTROL_TERMINATE:
+      return send_int (drv, DRMAA_CONTROL_TERMINATE);
     default:
       unknown (drv, buf, len);
       break;
@@ -473,7 +483,31 @@ control_drmaa (drmaa_drv_t *drv,
                char *command,
                int len)
 {
-  return 0;
+  int action = atoi (command);
+  char *job_id = strstr (command, ",");
+  if (!job_id)
+    {
+      fprintf (drv->log, "Command buffer should contain action and job_id: %s\n",
+               command);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Command buffer should contain action and job_id");
+    }
+  ++job_id;
+
+  drv->err_no = drmaa_control (job_id, action,
+                               drv->err_msg,
+                               DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't control job %s: %s\n",
+               job_id, drv->err_msg);
+      fflush (drv->log);
+
+      return send_error (drv, "error", drv->err_msg);
+    }
+
+  return send_atom (drv, "ok");
 }
 
 static int
@@ -889,7 +923,7 @@ send_job_ids_session (drmaa_drv_t *drv, const char *job_id_session)
 }
 
 static int
-send_timeout (drmaa_drv_t *drv, long timeout)
+send_int (drmaa_drv_t *drv, long timeout)
 {
   ErlDrvTermData result[] = {
       ERL_DRV_INT, timeout

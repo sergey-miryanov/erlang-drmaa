@@ -1,9 +1,6 @@
 - Driver:
-   - Implement control_drmaa
    - Implement job_ps
    - Implement async call to drmaa_synchronize
-   - Implement support of SESSION_ALL and SESSION_ANY in
-     control_drmaa function
   
 - Erlang:
    - Implement deadline_time
