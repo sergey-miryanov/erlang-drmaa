@@ -889,7 +889,7 @@ set_vector_attr (drmaa_drv_t *drv,
   value = strstr (value, ",");
   if (!value)
     {
-      fprintf (drv->log, "Command should contain number of items: %s\n", count);
+      fprintf (drv->log, "Command should contain number of items: %d\n", count);
       fflush (drv->log);
       return send_error (drv, "error", "Command should contain number of items");
     }
