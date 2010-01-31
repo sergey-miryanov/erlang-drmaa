@@ -5,7 +5,7 @@
 %-export ([main/1]).
 
 wait_job (JobID) ->
-  {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} = drmaa:wait (JobID, no_wait),
+  {ok, {job_id, JobID}, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} = drmaa:wait (JobID, no_wait),
   io:format ("~p: ~n", [JobID]),
   io:format ("  Exit: ~p~n  Exit status: ~p~n", [Exit, ExitStatus]),
   io:format ("  Usage: ~p~n~n", [Usage]).

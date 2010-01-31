@@ -670,6 +670,9 @@ wait (drmaa_drv_t *drv,
 
   ErlDrvTermData spec[] = {
       ERL_DRV_ATOM, driver_mk_atom ("ok"),
+      ERL_DRV_ATOM, driver_mk_atom ("job_id"),
+      ERL_DRV_STRING, (ErlDrvTermData)job_out, strlen (job_out),
+      ERL_DRV_TUPLE, 2,
       ERL_DRV_ATOM, driver_mk_atom ("exit"),
       ERL_DRV_STRING, (ErlDrvTermData)exit_type, strlen (exit_type),
       ERL_DRV_TUPLE, 2,
@@ -732,7 +735,7 @@ wait (drmaa_drv_t *drv,
   result[idx++] = ERL_DRV_TUPLE;
   result[idx++] = 2;
   result[idx++] = ERL_DRV_TUPLE;
-  result[idx++] = 4;
+  result[idx++] = 5;
 
   fprintf (drv->log, "result: %d, idx: %d\n", result_num, idx);
   fflush (drv->log);

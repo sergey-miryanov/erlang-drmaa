@@ -4,7 +4,6 @@
    - Implement async call to drmaa_synchronize
    - Implement support of SESSION_ALL and SESSION_ANY in
      control_drmaa function
-   - Return also JobID from drmaa:wait function
   
 - Erlang:
    - Implement deadline_time

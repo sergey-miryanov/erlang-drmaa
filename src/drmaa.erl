@@ -250,9 +250,8 @@ handle_call ({run_job}, _From, #state {port = Port} = State) ->
   {reply, {ok, JobID}, State};
 handle_call ({wait, JobID, Timeout}, _From, #state {port = Port} = State) ->
   Args = string:join ([erlang:integer_to_list (Timeout) | [JobID]], ","),
-  {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} 
-    = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (Args)),
-  {reply, {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}}, State};
+  Reply = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (Args)),
+  {reply, Reply, State};
 handle_call ({sync, Jobs, Timeout}, _From, #state { port = Port} = State) ->
   Len = length (Jobs),
   List = [erlang:integer_to_list (Len) | sync_jobs_to_list (Port, Jobs)],
