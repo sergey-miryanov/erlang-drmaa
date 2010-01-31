@@ -3,9 +3,10 @@
    - Implement job_ps
    - Implement async call to drmaa_synchronize
    - Implement support of SESSION_ALL and SESSION_ANY in
-     syncronize, control_drmaa and wait functions
+     control_drmaa function
    - Implement support of timeout values for synchronize and
      wait functions
+   - Return also JobID from drmaa:wait function
   
 - Erlang:
    - Implement deadline_time

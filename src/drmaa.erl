@@ -96,6 +96,8 @@ run_jobs (Start, End, Incr) when is_integer (Start)
 run_jobs (Count) when is_integer (Count) and (Count > 0) ->
   gen_server:call (drmaa, {run_jobs, 1, Count, 1}).
 
+wait (any) -> 
+  gen_server:call (drmaa, {wait, job_ids (any)});
 wait (JobID) when is_list (JobID) ->
   gen_server:call (drmaa, {wait, JobID}).
 
@@ -236,7 +238,7 @@ handle_call ({wait, JobID}, _From, #state {port = Port} = State) ->
   {reply, {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}}, State};
 handle_call ({sync, Jobs}, _From, #state { port = Port} = State) ->
   Len = length (Jobs),
-  List = [erlang:integer_to_list (Len) | Jobs],
+  List = [erlang:integer_to_list (Len) | sync_jobs_to_list (Port, Jobs)],
   Args = string:join (List, ","),
   Reply = drmaa:control (Port, ?CMD_SYNCHRONIZE, erlang:list_to_binary (Args)),
   {reply, Reply, State};
@@ -348,6 +350,15 @@ list_to_transfer_files ([error  | Tail], TF) -> list_to_transfer_files (Tail, ["
 list_to_transfer_files ([output | Tail], TF) -> list_to_transfer_files (Tail, ["o" | TF]);
 list_to_transfer_files ([], TF) ->
   TF.
+
+sync_jobs_to_list (Port, Jobs) ->
+  sync_jobs_to_list (Port, Jobs, []).
+sync_jobs_to_list (Port, [all | Tail], List) -> 
+  sync_jobs_to_list (Port, Tail, [drmaa:control (Port, ?CMD_JOB_IDS_SESSION_ALL) | List]);
+sync_jobs_to_list (Port, [H   | Tail], List) -> 
+  sync_jobs_to_list (Port, Tail, [H | List]);
+sync_jobs_to_list (_Port, [], List) ->
+  List.
 
 test (Port) ->
   port_control (Port, 1, <<"xxx">>),
