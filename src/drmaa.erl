@@ -30,6 +30,7 @@
 -export ([hlimit/1, slimit/1, hlimit_duration/1, slimit_duration/1]).
 -export ([transfer_files/1]).
 -export ([placeholder/1]).
+-export ([job_ids/1]).
 
 %% Internal
 -export ([control/2, control/3]).
@@ -67,6 +68,8 @@
 -define ('CMD_PLACEHOLDER_HD',          30).
 -define ('CMD_PLACEHOLDER_WD',          31).
 -define ('CMD_PLACEHOLDER_INCR',        32).
+-define ('CMD_JOB_IDS_SESSION_ALL',     33).
+-define ('CMD_JOB_IDS_SESSION_ANY',     34).
 
 -record (state, {port, ops = []}).
 
@@ -182,6 +185,10 @@ placeholder (wd) ->
 placeholder (working_dir) ->
   gen_server:call (drmaa, {placeholder_wd}).
 
+job_ids (all) ->
+  gen_server:call (drmaa, {job_ids_all});
+job_ids (any) ->
+  gen_server:call (drmaa, {job_ids_any}).
 
 %% gen_server callbacks %%
 
@@ -296,6 +303,12 @@ handle_call ({placeholder_wd}, _From, #state {port = Port} = State) ->
   {reply, Reply, State};
 handle_call ({placeholder_incr}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_PLACEHOLDER_INCR),
+  {reply, Reply, State};
+handle_call ({job_ids_all}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_JOB_IDS_SESSION_ALL),
+  {reply, Reply, State};
+handle_call ({job_ids_any}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_JOB_IDS_SESSION_ANY),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.

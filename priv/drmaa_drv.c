@@ -167,14 +167,15 @@ control (ErlDrvData p,
     SET_ATTR (WCT_SLIMIT);
     SET_ATTR (WD);
     case CMD_PLACEHOLDER_HD:
-      send_placeholder (drv, DRMAA_PLACEHOLDER_HD);
-      break;
+      return send_placeholder (drv, DRMAA_PLACEHOLDER_HD);
     case CMD_PLACEHOLDER_WD:
-      send_placeholder (drv, DRMAA_PLACEHOLDER_WD);
-      break;
+      return send_placeholder (drv, DRMAA_PLACEHOLDER_WD);
     case CMD_PLACEHOLDER_INCR:
-      send_placeholder (drv, DRMAA_PLACEHOLDER_INCR);
-      break;
+      return send_placeholder (drv, DRMAA_PLACEHOLDER_INCR);
+    case CMD_JOB_IDS_SESSION_ALL:
+      return send_job_ids_session (drv, DRMAA_JOB_IDS_SESSION_ALL);
+    case CMD_JOB_IDS_SESSION_ANY:
+      return send_job_ids_session (drv, DRMAA_JOB_IDS_SESSION_ANY);
     default:
       unknown (drv, buf, len);
       break;
@@ -839,6 +840,18 @@ send_placeholder (drmaa_drv_t *drv, const char *placeholder)
 {
   ErlDrvTermData result[] = {
       ERL_DRV_STRING, (ErlDrvTermData)placeholder, strlen (placeholder)
+  };
+
+  return driver_output_term (drv->port,
+                             result,
+                             sizeof (result) / sizeof (result[0]));
+}
+
+static int
+send_job_ids_session (drmaa_drv_t *drv, const char *job_id_session)
+{
+  ErlDrvTermData result[] = {
+      ERL_DRV_STRING, (ErlDrvTermData) job_id_session, strlen (job_id_session)
   };
 
   return driver_output_term (drv->port,
