@@ -112,7 +112,8 @@ control (ErlDrvData p,
          int rlen)
 {
   drmaa_drv_t *drv = (drmaa_drv_t *) (p);
-  buf[len] = 0;
+  if (len)
+    buf[len] = 0;
 
   fprintf (drv->log, "cmd: %d\n", command);
   fprintf (drv->log, "buf/%d: %s\n", len, buf);
@@ -491,8 +492,6 @@ wait (drmaa_drv_t *drv,
       char *command,
       int len)
 {
-  command[len] = 0;
-
   char job_out[DRMAA_JOBNAME_BUFFER] = {0};
   int status = 0;
   drmaa_attr_values_t *rusage = NULL;
@@ -668,7 +667,6 @@ set_attr (drmaa_drv_t *drv,
       return send_error (drv, "error", "Job template is null, allocate first");
     }
 
-  value[len] = 0;
   drv->err_no = drmaa_set_attribute (drv->job_template,
                                      name,
                                      value,
@@ -691,8 +689,6 @@ set_vector_attr (drmaa_drv_t *drv,
                  char *value,
                  int len)
 {
-  value[len] = 0;
-
   size_t count = atoi (value);
   if (!count)
     {
