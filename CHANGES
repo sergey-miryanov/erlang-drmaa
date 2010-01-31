@@ -1,4 +1,9 @@
-Version 0.3 (2010-01-29)
+Version 0.3b (2010-01-31)
+ - Implemented 
+   - Synchronize
+   - Fix memory corruption
+
+Version 0.3a (2010-01-29)
  - Implemented
    - Runk bulk jobs
    - Wrappers for HD, WD and INCR placeholders

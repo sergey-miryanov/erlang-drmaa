@@ -18,7 +18,7 @@
 %% API
 -export ([allocate_job_template/0, delete_job_template/0]).
 -export ([run_job/0, run_jobs/3, run_jobs/1]).
--export ([wait/1]).
+-export ([wait/1, synchronize/1]).
 -export ([join_files/1]).
 -export ([remote_command/1, args/1, env/1, emails/1]).
 -export ([job_state/1, working_dir/1]).
@@ -95,6 +95,9 @@ run_jobs (Count) when is_integer (Count) and (Count > 0) ->
 
 wait (JobID) when is_list (JobID) ->
   gen_server:call (drmaa, {wait, JobID}).
+
+synchronize (Jobs) when is_list (Jobs) ->
+  gen_server:call (drmaa, {sync, Jobs}, 30000).
 
 join_files (true) ->
   gen_server:call (drmaa, {join_files, "y"});
@@ -224,6 +227,12 @@ handle_call ({wait, JobID}, _From, #state {port = Port} = State) ->
   {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} 
     = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (JobID)),
   {reply, {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}}, State};
+handle_call ({sync, Jobs}, _From, #state { port = Port} = State) ->
+  Len = length (Jobs),
+  List = [erlang:integer_to_list (Len) | Jobs],
+  Args = string:join (List, ","),
+  Reply = drmaa:control (Port, ?CMD_SYNCHRONIZE, erlang:list_to_binary (Args)),
+  {reply, Reply, State};
 handle_call ({join_files, Join}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_JOIN_FILES, erlang:list_to_binary (Join)),
   {reply, Reply, State};

@@ -484,7 +484,74 @@ synchronize (drmaa_drv_t *drv,
              char *command,
              int len)
 {
-  return 0;
+  size_t job_count = atoi (command);
+  if (!job_count)
+    {
+      fprintf (drv->log, "Command buffer should contain at least one job_id: %s\n", command);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Command buffer should contain at least on job_id");
+    }
+
+  command = strstr (command, ",");
+  if (!command)
+    {
+      fprintf (drv->log, "Command buffer should contain any job ids: %s\n", command);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Command buffer should contain any job ids");
+    }
+
+  char const **job_ids = (char const **)driver_alloc (sizeof (char *) * (job_count + 1));
+  if (!job_ids)
+    {
+      fprintf (drv->log, "Couldn't allocate memory for job ids\n");
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Couldn't allocate memory for job ids");
+    }
+
+  ++command;
+
+  size_t idx = 0;
+  char *job_id = 0;
+  while ((job_id = strstr (command, ",")))
+    {
+      job_ids[idx++]  = command;
+      job_id[0]       = 0;
+      command         = job_id + 1;
+    }
+
+  if (strlen (command))
+    {
+      job_ids[idx++] = command;
+    }
+
+  job_ids[idx] = 0;
+
+  drv->err_no = drmaa_synchronize (job_ids, DRMAA_TIMEOUT_WAIT_FOREVER, 0, 
+                                   drv->err_msg, DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't synchronize with jobs: %s\n", drv->err_msg);
+      fflush (drv->log);
+
+      driver_free (job_ids);
+      return send_error (drv, "error", drv->err_msg);
+    }
+
+  ErlDrvTermData result[] = {
+      ERL_DRV_ATOM, driver_mk_atom ("ok"),
+      ERL_DRV_UINT, idx,
+      ERL_DRV_TUPLE, 2
+  };
+
+  int r = driver_output_term (drv->port,
+                              result,
+                              sizeof (result) / sizeof (result[0]));
+
+  driver_free (job_ids);
+  return r;
 }
 
 static int 

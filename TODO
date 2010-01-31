@@ -1,7 +1,14 @@
 - Driver:
-   - Implement synchronize
    - Implement control_drmaa
    - Implement job_ps
+   - Implement async call to drmaa_synchronize
+   - Implement getter for 
+     - DRMAA_JOB_ID_SESSION_ALL
+     - DRMAA_JOB_ID_SESSION_ANY
+   - Implement support of SESSION_ALL and SESSION_ANY in
+     syncronize, control_drmaa and wait functions
+   - Implement support of timeout values for synchronize and
+     wait functions
   
 - Erlang:
    - Implement deadline_time
