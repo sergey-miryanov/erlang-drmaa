@@ -70,9 +70,7 @@ control (ErlDrvData drv,
          int rlen);
 
 static int 
-unknown (drmaa_drv_t *drv, 
-         char *command,
-         int len);
+unknown (drmaa_drv_t *drv);
 
 static int 
 send_atom (drmaa_drv_t *drv,
@@ -89,61 +87,47 @@ ready_async (ErlDrvData drv_data,
 
 /* API */
 static int
-allocate_job_template (drmaa_drv_t *drv, 
-                       char *command,
-                       int len);
+allocate_job_template (drmaa_drv_t *drv);
 
 static int
-delete_job_template (drmaa_drv_t *drv,
-                     char *command,
-                     int len);
+delete_job_template (drmaa_drv_t *drv);
 
 static int
-run_job (drmaa_drv_t *drv,
-         char *command,
-         int len);
+run_job (drmaa_drv_t *drv);
 
 static int
 run_bulk_jobs (drmaa_drv_t *drv,
-               char *command,
-               int len);
+               char *command);
 
 static int
 control_drmaa (drmaa_drv_t *drv,
-               char *command,
-               int len);
+               char *command);
 
 static int 
 job_ps (drmaa_drv_t *drv,
-        char *command,
-        int len);
+        char *command);
 
 static int
 synchronize (drmaa_drv_t *drv,
-             char *command,
-             int len);
+             char *command);
 
 static int
 wait (drmaa_drv_t *drv,
-      char *buffer,
-      int len);
+      char *buffer);
 
 static int
 set_attr (drmaa_drv_t *drv,
           const char *name,
-          char *value,
-          int len);
+          char *value);
 
 static int 
 set_vector_attr (drmaa_drv_t *drv,
                  const char *name,
-                 char *value,
-                 int len);
+                 char *value);
 static int
 set_vector_attr_ (drmaa_drv_t *drv,
                   const char *name,
-                  const char **value,
-                  int len);
+                  const char **value);
 
 static int
 send_placeholder (drmaa_drv_t *drv,

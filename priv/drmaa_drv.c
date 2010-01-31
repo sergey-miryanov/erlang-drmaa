@@ -22,7 +22,10 @@ static ErlDrvEntry driver_entry__ = {
   ERL_DRV_EXTENDED_MARKER,          /* ERL_DRV_EXTENDED_MARKER */
   ERL_DRV_EXTENDED_MAJOR_VERSION,   /* ERL_DRV_EXTENDED_MAJOR_VERSION */
   ERL_DRV_EXTENDED_MAJOR_VERSION,   /* ERL_DRV_EXTENDED_MINOR_VERSION */
-  ERL_DRV_FLAG_USE_PORT_LOCKING     /* ERL_DRV_FLAGs */
+  ERL_DRV_FLAG_USE_PORT_LOCKING,    /* ERL_DRV_FLAGs */
+  NULL,                             /* handle2 */
+  NULL,                             /* process_exit */
+  NULL                              /* stop_select */
 };
 
 DRIVER_INIT (drmaa_driver)
@@ -96,11 +99,11 @@ stop (ErlDrvData p)
 
 #define SET_ATTR(NAME)                              \
   case CMD_##NAME:                                  \
-    set_attr (drv, DRMAA_##NAME, buf, len);         \
+    set_attr (drv, DRMAA_##NAME, buf);              \
     break;
 #define SET_V_ATTR(NAME)                            \
   case CMD_##NAME:                                  \
-    set_vector_attr (drv, DRMAA_##NAME, buf, len);  \
+    set_vector_attr (drv, DRMAA_##NAME, buf);       \
     break;
 
 static int
@@ -122,28 +125,28 @@ control (ErlDrvData p,
   switch (command)
     {
     case CMD_ALLOCATE_JOB_TEMPLATE:
-      allocate_job_template (drv, buf, len);
+      allocate_job_template (drv);
       break;
     case CMD_DELETE_JOB_TEMPLATE:
-      delete_job_template (drv, buf, len);
+      delete_job_template (drv);
       break;
     case CMD_RUN_JOB:
-      run_job (drv, buf, len);
+      run_job (drv);
       break;
     case CMD_RUN_BULK_JOBS:
-      run_bulk_jobs (drv, buf, len);
+      run_bulk_jobs (drv, buf);
       break;
     case CMD_CONTROL:
-      control_drmaa (drv, buf, len);
+      control_drmaa (drv, buf);
       break;
     case CMD_JOB_PS:
-      job_ps (drv, buf, len);
+      job_ps (drv, buf);
       break;
     case CMD_SYNCHRONIZE:
-      synchronize (drv, buf, len);
+      synchronize (drv, buf);
       break;
     case CMD_WAIT:
-      wait (drv, buf, len);
+      wait (drv, buf);
       break;
     SET_ATTR (BLOCK_EMAIL);
     SET_ATTR (DEADLINE_TIME);
@@ -191,7 +194,7 @@ control (ErlDrvData p,
     case CMD_CONTROL_TERMINATE:
       return send_int (drv, DRMAA_CONTROL_TERMINATE);
     default:
-      unknown (drv, buf, len);
+      unknown (drv);
       break;
     }
 
@@ -204,7 +207,7 @@ ready_async (ErlDrvData drv_data, ErlDrvThreadData thread_data)
 }
 
 static int
-unknown (drmaa_drv_t *drv, char *command, int len)
+unknown (drmaa_drv_t *drv)
 {
   ErlDrvTermData spec[] = {
       ERL_DRV_ATOM, driver_mk_atom ("error"),
@@ -230,7 +233,7 @@ send_atom (drmaa_drv_t *drv, char *atom)
                              sizeof (spec) / sizeof (spec[0]));
 }
 
-static
+static int
 send_error (drmaa_drv_t *drv,
             char *tag,
             char *msg)
@@ -247,9 +250,7 @@ send_error (drmaa_drv_t *drv,
 }
 
 static int
-allocate_job_template (drmaa_drv_t *drv, 
-                       char *command,
-                       int len)
+allocate_job_template (drmaa_drv_t *drv)
 {
   drv->err_no = drmaa_allocate_job_template (&drv->job_template, drv->err_msg, DRMAA_ERROR_STRING_BUFFER);
   if (is_error (drv->err_no))
@@ -264,9 +265,7 @@ allocate_job_template (drmaa_drv_t *drv,
 }
 
 static int
-delete_job_template (drmaa_drv_t *drv,
-                     char *command,
-                     int len)
+delete_job_template (drmaa_drv_t *drv)
 {
   if (!drv->job_template)
     {
@@ -291,9 +290,7 @@ delete_job_template (drmaa_drv_t *drv,
 }
 
 static int
-run_job (drmaa_drv_t *drv,
-         char *command,
-         int len)
+run_job (drmaa_drv_t *drv)
 {
   if (!drv->job_template)
     {
@@ -333,8 +330,7 @@ run_job (drmaa_drv_t *drv,
 
 static int
 run_bulk_jobs (drmaa_drv_t *drv,
-               char *command,
-               int len)
+               char *command)
 {
   if (!drv->job_template)
     {
@@ -480,8 +476,7 @@ run_bulk_jobs (drmaa_drv_t *drv,
 
 static int
 control_drmaa (drmaa_drv_t *drv,
-               char *command,
-               int len)
+               char *command)
 {
   int action = atoi (command);
   char *job_id = strstr (command, ",");
@@ -512,8 +507,7 @@ control_drmaa (drmaa_drv_t *drv,
 
 static int
 job_ps (drmaa_drv_t *drv,
-        char *command,
-        int len)
+        char *command)
 {
   int status = 0;
   drv->err_no = drmaa_job_ps (command, &status, 
@@ -579,8 +573,7 @@ job_ps (drmaa_drv_t *drv,
 
 static int 
 synchronize (drmaa_drv_t *drv,
-             char *command,
-             int len)
+             char *command)
 {
   size_t timeout = atoi (command);
   command = strstr (command, ",");
@@ -665,8 +658,7 @@ synchronize (drmaa_drv_t *drv,
 
 static int 
 wait (drmaa_drv_t *drv,
-      char *command,
-      int len)
+      char *command)
 {
   size_t timeout = atoi (command);
   command = strstr (command, ",");
@@ -750,7 +742,7 @@ wait (drmaa_drv_t *drv,
       fflush (drv->log);
     }
 
-  int attr_num = 0;
+  size_t attr_num = 0;
   drv->err_no = drmaa_get_num_attr_values (rusage, &attr_num);
   if (is_error (drv->err_no))
     {
@@ -846,8 +838,7 @@ wait (drmaa_drv_t *drv,
 static int
 set_attr (drmaa_drv_t *drv,
           const char *name,
-          char *value,
-          int len)
+          char *value)
 {
   if (!drv->job_template)
     {
@@ -876,14 +867,13 @@ set_attr (drmaa_drv_t *drv,
 static int
 set_vector_attr (drmaa_drv_t *drv,
                  const char *name,
-                 char *value,
-                 int len)
+                 char *value)
 {
   size_t count = atoi (value);
   if (!count)
     {
       const char *values[] = {0};
-      return set_vector_attr_ (drv, name, values, 0);
+      return set_vector_attr_ (drv, name, values);
     }
 
   value = strstr (value, ",");
@@ -921,7 +911,7 @@ set_vector_attr (drmaa_drv_t *drv,
     }
 
   values[idx] = 0;
-  int result = set_vector_attr_ (drv, name, values, idx);
+  int result = set_vector_attr_ (drv, name, values);
 
   driver_free (values);
   return result;
@@ -930,8 +920,7 @@ set_vector_attr (drmaa_drv_t *drv,
 static int
 set_vector_attr_ (drmaa_drv_t *drv,
                   const char *name,
-                  const char **values,
-                  int len)
+                  const char **values)
 {
   if (!drv->job_template)
     {

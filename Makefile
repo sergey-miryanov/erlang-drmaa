@@ -5,6 +5,10 @@ compile:
 	erl -make
 	cd priv && make
 
+debug:
+	erl -make
+	cd priv && make debug
+
 clean:
 	rm -rf ./ebin/*.beam
 	rm -rf ./ebin/*.so
