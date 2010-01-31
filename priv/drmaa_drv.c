@@ -684,7 +684,7 @@ wait (drmaa_drv_t *drv,
   drmaa_attr_values_t *rusage = NULL;
 
   drv->err_no = drmaa_wait (command, job_out, DRMAA_JOBNAME_BUFFER,
-                            &status, DRMAA_TIMEOUT_WAIT_FOREVER,
+                            &status, timeout,
                             &rusage, 
                             drv->err_msg, DRMAA_ERROR_STRING_BUFFER);
   if (is_error (drv->err_no))
