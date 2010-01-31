@@ -1,19 +1,15 @@
+%%% -------------------------------------------------------------------
+%%% \file drmaa.erl
+%%% @author Sergey Miryanov (sergey.miryanov@gmail.com)
+%%% @copyright 31 Jan 2010 by Sergey Miryanov
+%%% @version 0.4
+%%% @doc Erlang binding for DRMAA C interface
+%%% @end
+%%% -------------------------------------------------------------------
 -module (drmaa).
 -author ('sergey.miryanov@gmail.com').
--export ([test/1]).
 
 -behaviour (gen_server).
-
--export ([start_link/0]).
-
-%% gen_server
--export ([
-    init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3]).
 
 %% API
 -export ([allocate_job_template/0, delete_job_template/0]).
@@ -36,7 +32,17 @@
 -export ([timeout/1]).
 -export ([control_tag/1]).
 
+%% gen_server callbacks
+-export ([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3]).
+
 %% Internal
+-export ([start_link/0]).
 -export ([control_drv/2, control_drv/3]).
 -export ([pair_array_to_vector/1]).
 
@@ -84,19 +90,93 @@
 
 -record (state, {port, ops = []}).
 
+%% --------------------------------------------------------------------
+%% @spec start_link () -> {ok, Pid} | ignore | {error, Error}
+%% @doc Starts DRMAA session
+%% @end
+%% --------------------------------------------------------------------
+-type (result () :: {'ok', pid ()} | 'ignore' | {'error', any ()}).
+-spec (start_link/0::() -> result ()).
 start_link () ->
   gen_server:start_link ({local, drmaa}, ?MODULE, [], []).
 
 %% API %%
+%% --------------------------------------------------------------------
+%% @spec allocate_job_template () -> {ok}
+%% @doc
+%%   It is a wrapper for drmaa_allocate_job_template.
+%% 
+%%   Allocates a new job template and stores it in current session. This 
+%%   template is used to describe the job to be submitted. This 
+%%   description is accomplished by setting the desired scalar and vector 
+%%   attributes to their appropriate values. This template is then used 
+%%   in the job submission process.
+%% @end
+%% --------------------------------------------------------------------
+-spec (allocate_job_template/0::() -> {'ok'}).
 allocate_job_template () ->
   gen_server:call (drmaa, {allocate_job_template}).
 
+%% --------------------------------------------------------------------
+%% @spec delete_job_template () -> {ok}
+%% @doc
+%%   It is a wrapper for drmaa_delete_job_template.
+%% 
+%%   Frees the job template which stored in current session.
+%% @end
+%% --------------------------------------------------------------------
+-spec (delete_job_template/0::() -> {'ok'}).
 delete_job_template () ->
   gen_server:call (drmaa, {delete_job_template}).
 
+%% --------------------------------------------------------------------
+%% @spec run_job () -> {ok, JobID} | {error, Error}
+%%        JobID = string ()
+%%        Error = string ()
+%% @doc
+%%   It is a wrapper for drmaa_run_job.
+%% 
+%%   Submits a single job with the attributes defined in the job 
+%%   template stored in current session. On success returns job 
+%%   identifier.
+%% @end
+%% --------------------------------------------------------------------
+-type (job_id () :: string ()).
+-type (error () :: string ()).
+-spec (run_job/0::() -> {'ok', job_id ()} | {'error', error ()}).
 run_job () ->
   gen_server:call (drmaa, {run_job}).
 
+%% --------------------------------------------------------------------
+%% @spec run_jobs (Start, End, Incr) -> {ok, JobIDs} | {error, Error}
+%%        Start = integer ()
+%%        End = integer ()
+%%        Incr = integer ()
+%%        JobIDs = [string ()]
+%%        Error = string ()
+%% @doc
+%%   It is a wrapper for drmaa_run_bulk_jobs.
+%%
+%%   Submits a set of parametric jobs which can be run concurrently. The 
+%%   attributes defined in the job template are used for every parametric 
+%%   job in the set. Each job in the set is identical except for it's 
+%%   index. 
+%%   The first parametric job has an index equal to Start. The next job 
+%%   has an index equal to Start + Incr, and so on. The last job has an 
+%%   index equal to Start + n * Incr, where n is equal to 
+%%   (End – Start) / Incr. Note that the value of the last job's index 
+%%   may not be equal to End if the difference between Start and End is 
+%%   not evenly divisble by Incr. 
+%%   The smallest valid value for Start is 1. The largest valid value 
+%%   for End is 2147483647 (2^31-1). The Start value must be less than 
+%%   or equal to the End value, and only positive index numbers are 
+%%   allowed. On success, returns a list containing job identifiers for 
+%%   all submitted jobs.
+%% @end
+%% --------------------------------------------------------------------
+-type (job_ids () :: [string ()]).
+-spec (run_jobs/3:: (integer (), integer (), integer ()) -> 
+    {'ok', job_ids ()} | {'error', error ()}).
 run_jobs (Start, End, Incr) when is_integer (Start) 
                              and is_integer (End)
                              and is_integer (Incr) 
@@ -104,9 +184,67 @@ run_jobs (Start, End, Incr) when is_integer (Start)
                              and (Start =< End) 
                              and (End =< 2147483647) ->
   gen_server:call (drmaa, {run_jobs, Start, End, Incr}).
+
+%% --------------------------------------------------------------------
+%% @spec run_jobs (Count :: integer ()) -> {ok, JobIDs} | {error, Error}
+%%        JobIDs = [string ()]
+%%        Error = string ()
+%% @doc
+%%  It is a shortcut for run_jobs (1, Count, 1).
+%% 
+%% @see run_jobs/3. <b>run_jobs</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (run_jobs/1:: (integer ()) -> {'ok', job_ids ()} | {'error', error ()}).
 run_jobs (Count) when is_integer (Count) and (Count > 0) ->
   gen_server:call (drmaa, {run_jobs, 1, Count, 1}).
 
+%% --------------------------------------------------------------------
+%% @spec wait (JobID, Timeout) -> {ok, Result} | {error, Error}
+%%        JobID = string () | any
+%%        Timeout = integer () | infinity | no_wait
+%%        Result = {ok, {job_id, string ()}, {exit, string ()}, 
+%%                  {exit_status, string ()}, {usage, [string ()]}}
+%%        Error = string ()
+%% @doc
+%%   It is a wrapper for drmaa_wait.
+%% 
+%%   Waits for a job identified by JobID to finish execution or fail. 
+%%   If atom 'any' is provided as the JobID, this function will wait 
+%%   for any job from the session to finish execution or fail. In this 
+%%   case, any job for which exit status information is available will 
+%%   satisfy the requirement, including jobs which preivously finished 
+%%   but have never been the subject of a drmaa_wait() call. 
+%%
+%%   The Timeout parameter value indicates how many seconds to remain 
+%%   blocked in this call waiting for a result, before returning with 
+%%   an error. The atom 'infinity' may be specified to wait indefinitely 
+%%   for a result. The 'no_wait' may be specified to return immediately 
+%%   with an error if no result is available. 
+%%   
+%%   On success, returns job identifier, exit type, exit type and list
+%%   of strings that describe the amount of resources consumed by the 
+%%   job and are DRMAA C implementation defined. 
+%%   
+%%   Function reaps job data records on a successful call, so any 
+%%   subsequent calls to function will fail, returning an error, meaning 
+%%   that the job's data record has already been reaped. 
+%%
+%%   If function exists due to a timeout no rusage information is reaped. 
+%%   (The only case where function can be successfully called on a single 
+%%   job more than once).
+%%   
+%%   Exit and ExitStatus results filled by calling to drmaa_wifexited(), 
+%%   drmaa_wexitstatus(), drmaa_wifsignaled(), drmaa_wtermsig() and 
+%%   drmaa_wifaborted() functions.
+%% @end
+%% --------------------------------------------------------------------
+-type (drmaa_timeout () :: 'infinity' | 'no_wait' | integer ()).
+-type (wait_result () :: {'ok', {'job_id', string ()}, 
+    {'exit', string ()}, {'exit_status', string ()},
+    {'usage', [string ()]}}).
+-spec (wait/2:: (string () | 'any', drmaa_timeout ()) -> 
+    {ok, wait_result ()} | {error, string ()}).
 wait (JobID, infinity) -> wait (JobID, timeout (forever), infinity);
 wait (JobID, no_wait)  -> wait (JobID, timeout (no_wait), 1000);
 wait (JobID, Timeout)  -> wait (JobID, Timeout, Timeout * 2).
@@ -116,6 +254,36 @@ wait (any, Timeout, CallTimeout) when is_integer (Timeout) ->
 wait (JobID, Timeout, CallTimeout) when is_list (JobID) and is_integer (Timeout) ->
   gen_server:call (drmaa, {wait, JobID, Timeout}, CallTimeout).
 
+%% --------------------------------------------------------------------
+%% @spec synchronize (JobIDs, Timeout) -> {ok, integer ()} | {error, Error}
+%%        JobIDs = [string () | all]
+%%        Timeout = infinity | no_wait | integer ()
+%%        Error = string ()
+%% @doc
+%%   It is a wrapper for drmaa_synchronize.
+%% 
+%%   Function waits until all jobs specified by JobIDs have finished 
+%%   execution. If JobIDs contains an atom 'all', then this function 
+%%   shall wait for all jobs submitted during current session. 
+%%
+%%   To avoid thread race conditions in multithreaded applications, 
+%%   user should explicitly synchronize this call with any other job 
+%%   submission calls or control calls that may change the number of 
+%%   remote jobs.
+%%
+%%   The Timeout parameter value indicates how many seconds to remain 
+%%   blocked in this call waiting for results to become available, 
+%%   before returning with an timeout error. 
+%%   The atom 'infinity' may be specified to wait indefinitely for
+%%   a result. The atom 'no_wait' may be specified to return 
+%%   immediately with an timeout error if no result is available. 
+%%
+%%   Function lefts job's data records for future access via the 
+%%   wait call (@see wait/2. <b>wait</b>).
+%% @end
+%% --------------------------------------------------------------------
+-spec (synchronize/2::([string () | 'all'], drmaa_timeout ()) -> 
+    {'ok', integer ()} | {'error', string ()}).
 synchronize (Jobs, infinity) when is_list (Jobs) ->
   gen_server:call (drmaa, {sync, Jobs, timeout (forever)}, infinity);
 synchronize (Jobs, no_wait) when is_list (Jobs) ->
@@ -123,6 +291,26 @@ synchronize (Jobs, no_wait) when is_list (Jobs) ->
 synchronize (Jobs, Timeout) when is_list (Jobs) and is_integer (Timeout) ->
   gen_server:call (drmaa, {sync, Jobs, Timeout}, Timeout * 2).
 
+%% --------------------------------------------------------------------
+%% @spec control (JobID, Action) -> {ok} | {error, string ()}
+%%        JobID = string () | all
+%%        Action = suspend | resume | hold | release | terminate
+%% @doc
+%%   It is a wrapper for drmaa_control.
+%%   
+%%   Enacts the action indicated by Action on the job specified by the
+%%   job identifier, JobID. The Action parameter's value may be on the 
+%%   following: suspend, resume, hold, release, terminate (all values
+%%   mapped to DRMAA C implementation one-by-one).
+%%   
+%%   If JobID is an 'all' atom this function performs the specified 
+%%   action on all jobs submitted during current session.
+%% @end
+%% --------------------------------------------------------------------
+-type (control_action () :: 'suspend' | 'resume' | 'hold' | 
+  'release' | 'terminate').
+-spec (control/2::(string () | 'all', control_action ()) ->
+    {'ok'} | {'error', string ()}).
 control (all, Action) -> 
   control_inner (job_ids (all), Action);
 control (JobID, Action) -> 
@@ -139,6 +327,28 @@ control_inner (JobID, release) ->
 control_inner (JobID, terminate) -> 
   gen_server:call (drmaa, {control, control_tag (terminate), JobID}). 
 
+%% --------------------------------------------------------------------
+%% @spec job_status (string ()) -> {ok, string ()} | {error, string ()}
+%% @doc
+%%   It is a wrapper for drmaa_job_ps.
+%% 
+%%   Functions returns the program status of the job identified by JobID.
+%%   The possible values of a program's status are:
+%%    - Job status cannot be determined
+%%    - Job is queued and active
+%%    - Job has been placed in a hold state by the system or administrator
+%%    - Job has been placed in a hold state by the user
+%%    - Job has been placed in a hold state by the system or administrator and the user
+%%    - Job is running
+%%    - Job has been placed in a suspend state by the system or administrator
+%%    - Job has been placed in a suspend state by the user
+%%    - Job has been placed in a suspend state by the system or adminisrator and the user
+%%    - Job has successfully completed
+%%    - Job has terminated execution abnormally
+%%    - Unknown job status
+%% @end
+%% --------------------------------------------------------------------
+-spec (job_status/1::(string()) -> {'ok', string ()} | {'error', string ()}).
 job_status (JobID) ->
   gen_server:call (drmaa, {job_status, JobID}).
 
@@ -438,8 +648,3 @@ sync_jobs_to_list (Port, [H   | Tail], List) ->
 sync_jobs_to_list (_Port, [], List) ->
   List.
 
-test (Port) ->
-  port_control (Port, 1, <<"xxx">>),
-  port_control (Port, 2, <<"xxx">>),
-  port_control (Port, 3, <<"xxx">>),
-  port_control (Port, 4, <<"xxx">>).

@@ -17,6 +17,8 @@ clean:
 run:
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib erl -pa ./ebin -sname zerg
 
+docs:
+	erl -noshell -run edoc_run application "'drmaa'" '"."' '[{title, "Erlang binding for DRMAA C interface"}, {hidden, false}, {private, false}]' -s erlang halt
 ex:
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/run_job.erl
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/wait_job.erl
