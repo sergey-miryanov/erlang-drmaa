@@ -515,7 +515,66 @@ job_ps (drmaa_drv_t *drv,
         char *command,
         int len)
 {
-  return 0;
+  int status = 0;
+  drv->err_no = drmaa_job_ps (command, &status, 
+                              drv->err_msg,
+                              DRMAA_ERROR_STRING_BUFFER);
+  if (is_error (drv->err_no))
+    {
+      fprintf (drv->log, "Couldn't obtain job %s status: %s\n",
+               command, drv->err_msg);
+      fflush (drv->log);
+
+      return send_error (drv, "error", drv->err_msg);
+    }
+
+  const char *message = "Unknown job status";
+  switch (status)
+    {
+    case DRMAA_PS_UNDETERMINED:
+      message = "Job status cannot be determined";
+      break;
+    case DRMAA_PS_QUEUED_ACTIVE:
+      message = "Job is queued and active";
+      break;
+    case DRMAA_PS_SYSTEM_ON_HOLD:
+      message = "Job has been placed in a hold state by the system or administrator";
+      break;
+    case DRMAA_PS_USER_ON_HOLD:
+      message = "Job has been placed in a hold state by the user";
+      break;
+    case DRMAA_PS_USER_SYSTEM_ON_HOLD:
+      message = "Job has been placed in a hold state by the system or administrator and the user";
+      break;
+    case DRMAA_PS_RUNNING:
+      message = "Job is running";
+      break;
+    case DRMAA_PS_SYSTEM_SUSPENDED:
+      message = "Job has been placed in a suspend state by the system or administrator";
+      break;
+    case DRMAA_PS_USER_SUSPENDED:
+      message = "Job has been placed in a suspend state by the user";
+      break;
+    case DRMAA_PS_USER_SYSTEM_SUSPENDED:
+      message = "Job has been placed in a suspend state by the system or adminisrator and the user";
+      break;
+    case DRMAA_PS_DONE:
+      message = "Job has successfully completed";
+      break;
+    case DRMAA_PS_FAILED:
+      message = "Job has terminated execution abnormally";
+      break;
+    }
+
+  ErlDrvTermData result[] = {
+      ERL_DRV_ATOM, driver_mk_atom ("ok"),
+      ERL_DRV_STRING, (ErlDrvTermData) message, strlen (message),
+      ERL_DRV_TUPLE, 2
+  };
+
+  return driver_output_term (drv->port,
+                             result,
+                             sizeof (result) / sizeof (result[0]));
 }
 
 static int 

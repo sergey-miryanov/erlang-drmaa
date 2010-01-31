@@ -20,6 +20,7 @@
 -export ([run_job/0, run_jobs/3, run_jobs/1]).
 -export ([wait/2, synchronize/2]).
 -export ([control/2]).
+-export ([job_status/1]).
 -export ([join_files/1]).
 -export ([remote_command/1, args/1, env/1, emails/1]).
 -export ([job_state/1, working_dir/1]).
@@ -122,14 +123,24 @@ synchronize (Jobs, no_wait) when is_list (Jobs) ->
 synchronize (Jobs, Timeout) when is_list (Jobs) and is_integer (Timeout) ->
   gen_server:call (drmaa, {sync, Jobs, Timeout}, Timeout * 2).
 
-control (all, Action)     -> control_inner (job_ids (all), Action);
-control (JobID, Action)   -> control_inner (JobID, Action).
+control (all, Action) -> 
+  control_inner (job_ids (all), Action);
+control (JobID, Action) -> 
+  control_inner (JobID, Action).
 
-control_inner (JobID, suspend)    -> gen_server:call (drmaa, {control, control_tag (suspend),   JobID});
-control_inner (JobID, resume)     -> gen_server:call (drmaa, {control, control_tag (resume),    JobID});
-control_inner (JobID, hold)       -> gen_server:call (drmaa, {control, control_tag (hold),      JobID});
-control_inner (JobID, release)    -> gen_server:call (drmaa, {control, control_tag (release),   JobID});
-control_inner (JobID, terminate)  -> gen_server:call (drmaa, {control, control_tag (terminate), JobID}). 
+control_inner (JobID, suspend) -> 
+  gen_server:call (drmaa, {control, control_tag (suspend),   JobID});
+control_inner (JobID, resume) -> 
+  gen_server:call (drmaa, {control, control_tag (resume),    JobID});
+control_inner (JobID, hold) -> 
+  gen_server:call (drmaa, {control, control_tag (hold),      JobID});
+control_inner (JobID, release) -> 
+  gen_server:call (drmaa, {control, control_tag (release),   JobID});
+control_inner (JobID, terminate) -> 
+  gen_server:call (drmaa, {control, control_tag (terminate), JobID}). 
+
+job_status (JobID) ->
+  gen_server:call (drmaa, {job_status, JobID}).
 
 join_files (true) ->
   gen_server:call (drmaa, {join_files, "y"});
@@ -224,11 +235,16 @@ timeout (forever) ->
 timeout (no_wait) ->
   gen_server:call (drmaa, {timeout, no_wait}).
 
-control_tag (suspend)   -> gen_server:call (drmaa, {control_tag, suspend});
-control_tag (resume)    -> gen_server:call (drmaa, {control_tag, resume});
-control_tag (hold)      -> gen_server:call (drmaa, {control_tag, hold});
-control_tag (release)   -> gen_server:call (drmaa, {control_tag, release});
-control_tag (terminate) -> gen_server:call (drmaa, {control_tag, terminate}).
+control_tag (suspend) -> 
+  gen_server:call (drmaa, {control_tag, suspend});
+control_tag (resume) -> 
+  gen_server:call (drmaa, {control_tag, resume});
+control_tag (hold) -> 
+  gen_server:call (drmaa, {control_tag, hold});
+control_tag (release) -> 
+  gen_server:call (drmaa, {control_tag, release});
+control_tag (terminate) -> 
+  gen_server:call (drmaa, {control_tag, terminate}).
 
 %% gen_server callbacks %%
 
@@ -282,6 +298,9 @@ handle_call ({sync, Jobs, Timeout}, _From, #state { port = Port} = State) ->
   {reply, Reply, State};
 handle_call ({control, Action, JobID}, _From, #state {port = Port} = State) ->
   Reply = control_impl (Port, Action, JobID),
+  {reply, Reply, State};
+handle_call ({job_status, JobID}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control_drv (Port, ?CMD_JOB_PS, erlang:list_to_binary (JobID)),
   {reply, Reply, State};
 handle_call ({join_files, Join}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control_drv (Port, ?CMD_JOIN_FILES, erlang:list_to_binary (Join)),

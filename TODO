@@ -1,5 +1,4 @@
 - Driver:
-   - Implement job_ps
    - Implement async call to drmaa_synchronize
   
 - Erlang:

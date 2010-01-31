@@ -22,3 +22,4 @@ ex:
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/bulk_jobs.erl
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/synchronize.erl
 	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/sync_all.erl
+	LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib	./examples/job_status.erl
