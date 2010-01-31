@@ -37,6 +37,8 @@
 #define CMD_PLACEHOLDER_INCR        32
 #define CMD_JOB_IDS_SESSION_ALL     33
 #define CMD_JOB_IDS_SESSION_ANY     34
+#define CMD_TIMEOUT_FOREVER         35
+#define CMD_TIMEOUT_NO_WAIT         36
 
 typedef struct drmaa_drv_t {
   char                  err_msg[DRMAA_ERROR_STRING_BUFFER];
@@ -145,3 +147,7 @@ send_placeholder (drmaa_drv_t *drv,
 static int
 send_job_ids_session (drmaa_drv_t *drv,
                       const char *job_id_session);
+
+static int
+send_timeout (drmaa_drv_t *drv,
+              long timeout);

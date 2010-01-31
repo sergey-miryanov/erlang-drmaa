@@ -18,7 +18,7 @@
 %% API
 -export ([allocate_job_template/0, delete_job_template/0]).
 -export ([run_job/0, run_jobs/3, run_jobs/1]).
--export ([wait/1, synchronize/1]).
+-export ([wait/2, synchronize/2]).
 -export ([join_files/1]).
 -export ([remote_command/1, args/1, env/1, emails/1]).
 -export ([job_state/1, working_dir/1]).
@@ -31,6 +31,7 @@
 -export ([transfer_files/1]).
 -export ([placeholder/1]).
 -export ([job_ids/1]).
+-export ([timeout/1]).
 
 %% Internal
 -export ([control/2, control/3]).
@@ -70,6 +71,8 @@
 -define ('CMD_PLACEHOLDER_INCR',        32).
 -define ('CMD_JOB_IDS_SESSION_ALL',     33).
 -define ('CMD_JOB_IDS_SESSION_ANY',     34).
+-define ('CMD_TIMEOUT_FOREVER',         35).
+-define ('CMD_TIMEOUT_NO_WAIT',         36).
 
 -record (state, {port, ops = []}).
 
@@ -96,13 +99,21 @@ run_jobs (Start, End, Incr) when is_integer (Start)
 run_jobs (Count) when is_integer (Count) and (Count > 0) ->
   gen_server:call (drmaa, {run_jobs, 1, Count, 1}).
 
-wait (any) -> 
-  gen_server:call (drmaa, {wait, job_ids (any)});
-wait (JobID) when is_list (JobID) ->
-  gen_server:call (drmaa, {wait, JobID}).
+wait (JobID, infinity) -> wait (JobID, timeout (forever), infinity);
+wait (JobID, no_wait)  -> wait (JobID, timeout (no_wait), 1000);
+wait (JobID, Timeout)  -> wait (JobID, Timeout, Timeout * 2).
 
-synchronize (Jobs) when is_list (Jobs) ->
-  gen_server:call (drmaa, {sync, Jobs}, 30000).
+wait (any, Timeout, CallTimeout) when is_integer (Timeout) -> 
+  gen_server:call (drmaa, {wait, job_ids (any), Timeout}, CallTimeout);
+wait (JobID, Timeout, CallTimeout) when is_list (JobID) and is_integer (Timeout) ->
+  gen_server:call (drmaa, {wait, JobID, Timeout}, CallTimeout).
+
+synchronize (Jobs, infinity) when is_list (Jobs) ->
+  gen_server:call (drmaa, {sync, Jobs, timeout (forever)}, infinity);
+synchronize (Jobs, no_wait) when is_list (Jobs) ->
+  gen_server:call (drmaa, {sync, Jobs, timeout (no_wait)}, 1000);
+synchronize (Jobs, Timeout) when is_list (Jobs) and is_integer (Timeout) ->
+  gen_server:call (drmaa, {sync, Jobs, Timeout}, Timeout * 2).
 
 join_files (true) ->
   gen_server:call (drmaa, {join_files, "y"});
@@ -192,6 +203,11 @@ job_ids (all) ->
 job_ids (any) ->
   gen_server:call (drmaa, {job_ids_any}).
 
+timeout (forever) ->
+  gen_server:call (drmaa, {timeout, forever});
+timeout (no_wait) ->
+  gen_server:call (drmaa, {timeout, no_wait}).
+
 %% gen_server callbacks %%
 
 init ([]) ->
@@ -232,14 +248,15 @@ handle_call ({delete_job_template}, _From, #state {port = Port} = State) ->
 handle_call ({run_job}, _From, #state {port = Port} = State) ->
   {ok, JobID} = drmaa:control (Port, ?CMD_RUN_JOB),
   {reply, {ok, JobID}, State};
-handle_call ({wait, JobID}, _From, #state {port = Port} = State) ->
+handle_call ({wait, JobID, Timeout}, _From, #state {port = Port} = State) ->
+  Args = string:join ([erlang:integer_to_list (Timeout) | [JobID]], ","),
   {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} 
-    = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (JobID)),
+    = drmaa:control (Port, ?CMD_WAIT, erlang:list_to_binary (Args)),
   {reply, {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}}, State};
-handle_call ({sync, Jobs}, _From, #state { port = Port} = State) ->
+handle_call ({sync, Jobs, Timeout}, _From, #state { port = Port} = State) ->
   Len = length (Jobs),
   List = [erlang:integer_to_list (Len) | sync_jobs_to_list (Port, Jobs)],
-  Args = string:join (List, ","),
+  Args = string:join ([erlang:integer_to_list (Timeout) | List], ","),
   Reply = drmaa:control (Port, ?CMD_SYNCHRONIZE, erlang:list_to_binary (Args)),
   {reply, Reply, State};
 handle_call ({join_files, Join}, _From, #state {port = Port} = State) ->
@@ -311,6 +328,12 @@ handle_call ({job_ids_all}, _From, #state {port = Port} = State) ->
   {reply, Reply, State};
 handle_call ({job_ids_any}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control (Port, ?CMD_JOB_IDS_SESSION_ANY),
+  {reply, Reply, State};
+handle_call ({timeout, forever}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_TIMEOUT_FOREVER),
+  {reply, Reply, State};
+handle_call ({timeout, no_wait}, _From, #state {port = Port} = State) ->
+  Reply = drmaa:control (Port, ?CMD_TIMEOUT_NO_WAIT),
   {reply, Reply, State};
 handle_call (Request, _From, State) ->
   {reply, {unknown, Request}, State}.

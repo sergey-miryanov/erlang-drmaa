@@ -34,7 +34,7 @@ main (_) ->
   {ok, JobID} = drmaa:run_job (),
   io:format ("Job has been submitted with id: ~p~n", [JobID]),
 
-  {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} = drmaa:wait (JobID),
+  {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} = drmaa:wait (JobID, infinity),
   io:format ("Exit: ~p~nExit status: ~p~n", [Exit, ExitStatus]),
   io:format ("Usage: ~p~n", [Usage]),
 

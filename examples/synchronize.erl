@@ -5,7 +5,7 @@
 %-export ([main/1]).
 
 wait_job (JobID) ->
-  {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} = drmaa:wait (JobID),
+  {ok, {exit, Exit}, {exit_status, ExitStatus}, {usage, Usage}} = drmaa:wait (JobID, no_wait),
   io:format ("~p: ~n", [JobID]),
   io:format ("  Exit: ~p~n  Exit status: ~p~n", [Exit, ExitStatus]),
   io:format ("  Usage: ~p~n~n", [Usage]).
@@ -25,7 +25,7 @@ main (_) ->
   {ok, Jobs} = drmaa:run_jobs (2),
   io:format ("Jobs has been submitted with ids: ~p~n", [Jobs]),
 
-  {ok, JobsCount} = drmaa:synchronize (Jobs),
+  {ok, JobsCount} = drmaa:synchronize (Jobs, 30000),
   io:format ("Synchronized well: ~p~n", [JobsCount]),
 
   lists:foreach (fun (A) -> wait_job (A) end, Jobs),

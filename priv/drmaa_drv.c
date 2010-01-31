@@ -176,6 +176,10 @@ control (ErlDrvData p,
       return send_job_ids_session (drv, DRMAA_JOB_IDS_SESSION_ALL);
     case CMD_JOB_IDS_SESSION_ANY:
       return send_job_ids_session (drv, DRMAA_JOB_IDS_SESSION_ANY);
+    case CMD_TIMEOUT_FOREVER:
+      return send_timeout (drv, DRMAA_TIMEOUT_WAIT_FOREVER);
+    case CMD_TIMEOUT_NO_WAIT:
+      return send_timeout (drv, DRMAA_TIMEOUT_NO_WAIT);
     default:
       unknown (drv, buf, len);
       break;
@@ -485,6 +489,17 @@ synchronize (drmaa_drv_t *drv,
              char *command,
              int len)
 {
+  size_t timeout = atoi (command);
+  command = strstr (command, ",");
+  if (!command)
+    {
+      fprintf (drv->log, "Command should contain not only timeout value: %s\n", command);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Command should contain not only timeout value");
+    }
+  ++command;
+
   size_t job_count = atoi (command);
   if (!job_count)
     {
@@ -530,7 +545,7 @@ synchronize (drmaa_drv_t *drv,
 
   job_ids[idx] = 0;
 
-  drv->err_no = drmaa_synchronize (job_ids, DRMAA_TIMEOUT_WAIT_FOREVER, 0, 
+  drv->err_no = drmaa_synchronize (job_ids, timeout, 0, 
                                    drv->err_msg, DRMAA_ERROR_STRING_BUFFER);
   if (is_error (drv->err_no))
     {
@@ -560,6 +575,17 @@ wait (drmaa_drv_t *drv,
       char *command,
       int len)
 {
+  size_t timeout = atoi (command);
+  command = strstr (command, ",");
+  if (!command)
+    {
+      fprintf (drv->log, "Command buffer should contain not only timeout value: %s\n", command);
+      fflush (drv->log);
+
+      return send_error (drv, "error", "Command buffer should contain not only timeout value");
+    }
+  ++command;
+
   char job_out[DRMAA_JOBNAME_BUFFER] = {0};
   int status = 0;
   drmaa_attr_values_t *rusage = NULL;
@@ -852,6 +878,18 @@ send_job_ids_session (drmaa_drv_t *drv, const char *job_id_session)
 {
   ErlDrvTermData result[] = {
       ERL_DRV_STRING, (ErlDrvTermData) job_id_session, strlen (job_id_session)
+  };
+
+  return driver_output_term (drv->port,
+                             result,
+                             sizeof (result) / sizeof (result[0]));
+}
+
+static int
+send_timeout (drmaa_drv_t *drv, long timeout)
+{
+  ErlDrvTermData result[] = {
+      ERL_DRV_INT, timeout
   };
 
   return driver_output_term (drv->port,
