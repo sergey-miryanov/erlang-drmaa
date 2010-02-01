@@ -13,7 +13,6 @@
    - Implement slimit (DRMAA_WCT_SLIMIT)
   
 - Documentation
-  - Attributes
-  - Getters
+  - Driver
 - Examples
 - Tests

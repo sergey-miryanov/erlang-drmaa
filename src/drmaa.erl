@@ -1,7 +1,5 @@
 %%% -------------------------------------------------------------------
-%%% \file drmaa.erl
 %%% @author Sergey Miryanov (sergey.miryanov@gmail.com)
-%%% @copyright 31 Jan 2010 by Sergey Miryanov
 %%% @version 0.4
 %%% @doc Erlang binding for DRMAA C interface
 %%% @end
@@ -44,7 +42,6 @@
 %% Internal
 -export ([start_link/0]).
 -export ([control_drv/2, control_drv/3]).
--export ([pair_array_to_vector/1]).
 
 -define ('CMD_ALLOCATE_JOB_TEMPLATE',   1).
 -define ('CMD_DELETE_JOB_TEMPLATE',     2).
@@ -104,7 +101,7 @@ start_link () ->
 %% --------------------------------------------------------------------
 %% @spec allocate_job_template () -> {ok}
 %% @doc
-%%   It is a wrapper for drmaa_allocate_job_template.
+%%   Wrapper for drmaa_allocate_job_template.
 %% 
 %%   Allocates a new job template and stores it in current session. This 
 %%   template is used to describe the job to be submitted. This 
@@ -120,7 +117,7 @@ allocate_job_template () ->
 %% --------------------------------------------------------------------
 %% @spec delete_job_template () -> {ok}
 %% @doc
-%%   It is a wrapper for drmaa_delete_job_template.
+%%   Wrapper for drmaa_delete_job_template.
 %% 
 %%   Frees the job template which stored in current session.
 %% @end
@@ -134,7 +131,7 @@ delete_job_template () ->
 %%        JobID = string ()
 %%        Error = string ()
 %% @doc
-%%   It is a wrapper for drmaa_run_job.
+%%   Wrapper for drmaa_run_job.
 %% 
 %%   Submits a single job with the attributes defined in the job 
 %%   template stored in current session. On success returns job 
@@ -155,18 +152,20 @@ run_job () ->
 %%        JobIDs = [string ()]
 %%        Error = string ()
 %% @doc
-%%   It is a wrapper for drmaa_run_bulk_jobs.
+%%   Wrapper for drmaa_run_bulk_jobs.
 %%
 %%   Submits a set of parametric jobs which can be run concurrently. The 
 %%   attributes defined in the job template are used for every parametric 
 %%   job in the set. Each job in the set is identical except for it's 
 %%   index. 
+%%
 %%   The first parametric job has an index equal to Start. The next job 
 %%   has an index equal to Start + Incr, and so on. The last job has an 
 %%   index equal to Start + n * Incr, where n is equal to 
 %%   (End – Start) / Incr. Note that the value of the last job's index 
 %%   may not be equal to End if the difference between Start and End is 
 %%   not evenly divisble by Incr. 
+%%
 %%   The smallest valid value for Start is 1. The largest valid value 
 %%   for End is 2147483647 (2^31-1). The Start value must be less than 
 %%   or equal to the End value, and only positive index numbers are 
@@ -190,7 +189,7 @@ run_jobs (Start, End, Incr) when is_integer (Start)
 %%        JobIDs = [string ()]
 %%        Error = string ()
 %% @doc
-%%  It is a shortcut for run_jobs (1, Count, 1).
+%%  Shortcut for run_jobs (1, Count, 1).
 %% 
 %% @see run_jobs/3. <b>run_jobs</b>
 %% @end
@@ -207,7 +206,7 @@ run_jobs (Count) when is_integer (Count) and (Count > 0) ->
 %%                  {exit_status, string ()}, {usage, [string ()]}}
 %%        Error = string ()
 %% @doc
-%%   It is a wrapper for drmaa_wait.
+%%   Wrapper for drmaa_wait.
 %% 
 %%   Waits for a job identified by JobID to finish execution or fail. 
 %%   If atom 'any' is provided as the JobID, this function will wait 
@@ -260,7 +259,7 @@ wait (JobID, Timeout, CallTimeout) when is_list (JobID) and is_integer (Timeout)
 %%        Timeout = infinity | no_wait | integer ()
 %%        Error = string ()
 %% @doc
-%%   It is a wrapper for drmaa_synchronize.
+%%   Wrapper for drmaa_synchronize.
 %% 
 %%   Function waits until all jobs specified by JobIDs have finished 
 %%   execution. If JobIDs contains an atom 'all', then this function 
@@ -279,7 +278,8 @@ wait (JobID, Timeout, CallTimeout) when is_list (JobID) and is_integer (Timeout)
 %%   immediately with an timeout error if no result is available. 
 %%
 %%   Function lefts job's data records for future access via the 
-%%   wait call (@see wait/2. <b>wait</b>).
+%%   drmaa:wait call.
+%% @see wait/2. <b>drmaa:wait</b>
 %% @end
 %% --------------------------------------------------------------------
 -spec (synchronize/2::([string () | 'all'], drmaa_timeout ()) -> 
@@ -296,7 +296,7 @@ synchronize (Jobs, Timeout) when is_list (Jobs) and is_integer (Timeout) ->
 %%        JobID = string () | all
 %%        Action = suspend | resume | hold | release | terminate
 %% @doc
-%%   It is a wrapper for drmaa_control.
+%%   Wrapper for drmaa_control.
 %%   
 %%   Enacts the action indicated by Action on the job specified by the
 %%   job identifier, JobID. The Action parameter's value may be on the 
@@ -330,7 +330,7 @@ control_inner (JobID, terminate) ->
 %% --------------------------------------------------------------------
 %% @spec job_status (string ()) -> {ok, string ()} | {error, string ()}
 %% @doc
-%%   It is a wrapper for drmaa_job_ps.
+%%   Wrapper for drmaa_job_ps.
 %% 
 %%   Functions returns the program status of the job identified by JobID.
 %%   The possible values of a program's status are:
@@ -352,76 +352,607 @@ control_inner (JobID, terminate) ->
 job_status (JobID) ->
   gen_server:call (drmaa, {job_status, JobID}).
 
+%% --------------------------------------------------------------------
+%% @spec join_files (true | false) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_join_files attribute.
+%%
+%%   The drmaa_join_files attribute specifies whether the job's error 
+%%   stream should be intermixed with the job's output stream. If not 
+%%   explicitly set in the job template, the attribute's value defaults 
+%%   to 'false'.
+%%
+%%   Either 'true' or 'false' can be specified as valid attribute values. 
+%%   If 'true' is specified as the attribute value, the DRMAA 
+%%   implementation will ignore the value of the drmaa:error_path
+%%   and intermix the standard error stream with the standard output 
+%%   stream at the location specified by the drmaa::output_path.
+%%
+%% @see error_path/1. <b>drmaa:error_path</b>
+%% @see output_path/1. <b>drmaa:output_path</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (join_files/1::('true' | 'false') -> {'ok'} | {'error', string ()}).
 join_files (true) ->
   gen_server:call (drmaa, {join_files, "y"});
 join_files (false) ->
   gen_server:call (drmaa, {join_files, "n"}).
 
+%% --------------------------------------------------------------------
+%% @spec remote_command (string ()) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_remote_command attribute.
+%%
+%%   The drmaa_remote_command attribute specifies the remote command to 
+%%   execute. The drmaa_remote_command must be the path of an executable 
+%%   that is available at the job's execution host. If the path is 
+%%   relative, it is assumed to be relative to the working directory, 
+%%   usually set through the drmaa:working_dir. If the working directory 
+%%   is not set, the path is interpreted in an DRMAA C interface 
+%%   implementation-specific manner. In any case, no binary file 
+%%   management is done.
+%% @see working_dir/1. <b>drmaa:working_dir</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (remote_command/1::(string ()) -> {'ok'} | {'error', string ()}).
 remote_command (Command) when is_list (Command) ->
   gen_server:call (drmaa, {remote_command, Command}).
 
+%% --------------------------------------------------------------------
+%% @spec args ([string ()]) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_v_argv attribute vector.
+%%
+%%   The drmaa_v_argv attribute specifies the array of string values 
+%%   which will be passed as arguments to the job.
+%% @end
+%% --------------------------------------------------------------------
+-spec (args/1::([string ()]) -> {'ok'} | {'error', string ()}).
 args (Argv) when is_list (Argv) ->
   gen_server:call (drmaa, {args, Argv}).
 
+%% --------------------------------------------------------------------
+%% @spec env (Env) -> {ok} | {error, string ()}
+%%        Env = [{atom (), string ()}]
+%% @doc
+%%   Sets drmaa_v_env attribute vector.
+%%
+%%   The drmaa_v_env attribute specifies the environment variable 
+%%   settings for the job to be submitted. 
+%% @end
+%% --------------------------------------------------------------------
+-type (env_list () :: [{atom (), string ()}]).
+-spec (env/1::(env_list ()) -> {'ok'} | {'error', string ()}).
 env (Env) when is_list (Env) ->
   gen_server:call (drmaa, {env, Env}).
 
+%% --------------------------------------------------------------------
+%% @spec emails ([string ()]) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_v_email attribute vector.
+%%
+%%   The drmaa_v_email attribute specifies the list of e-mail addresses 
+%%   to which job completion and status reports are to be sent. Which 
+%%   reports are sent and when they are sent are determined by the DRMS 
+%%   configuration and the drmaa:block_email.
+%% @see block_email/1. <b>drmaa:block_email</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (emails/1::([string ()]) -> {'ok'} | {'error', string ()}).
 emails (Emails) when is_list (Emails) ->
   gen_server:call (drmaa, {emails, Emails}).
 
+%% --------------------------------------------------------------------
+%% @spec job_state (active | hold) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_js_state attribute.
+%%
+%%   The drmaa_js_state attribute specifies the job's state at submission. 
+%% 
+%%   When 'active' is used, the job will be submitted in a runnable state. <br/>
+%%   When 'hold' is used, the job will be submitted in a user hold state 
+%%   (either DRMAA_PS_USER_ON_HOLD or DRMAA_PS_USER_SYSTEM_ON_HOLD).
+%% @end
+%% --------------------------------------------------------------------
+-spec (job_state/1::('active' | 'hold') -> {'ok'} | {'error', string ()}).
 job_state (active) ->
   gen_server:call (drmaa, {job_state, "drmaa_active"});
 job_state (hold) ->
   gen_server:call (drmaa, {job_state, "drmaa_hold"}).
 
+%% --------------------------------------------------------------------
+%% @spec working_dir (string ()) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_wd attribute.
+%%
+%%   The drmaa_wd attribute specifies the directory name where the job 
+%%   will be executed. A drmaa:placeholder (hd) at the beginning of the 
+%%   drmaa:wd value denotes the remaining string portion as a relative 
+%%   directory name which is resolved relative to the job user's home
+%%   directory at the execution host. When the DRMAA job template is 
+%%   used for bulk job submission drmaa:placeholder (incr) can be used 
+%%   at any position within the drmaa:wd value to cause a substitution 
+%%   with the parametric job's index.
+%%
+%%   The drmaa:wd value must be specified in a syntax that is common at 
+%%   the host where the job is executed. If set to a relative path and 
+%%   no placeholder is used, the path is interpreted in a DRMAA C 
+%%   interface implementation-specific manner. If not set, the working 
+%%   directory will be set in a DRMAA C interface implementation-
+%%   specific manner. If set and the given directory does not exist, 
+%%   the job will enter the DRMAA_PS_FAILED state when run.
+%% @see placeholder/1. <b>drmaa:placeholder</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (working_dir/1::(string ()) -> {'ok'} | {'error', string ()}).
 working_dir (Dir) when is_list (Dir) ->
   gen_server:call (drmaa, {wd, Dir}).
 
+%% --------------------------------------------------------------------
+%% @spec job_name (string ()) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_job_name attribute.
+%%
+%%   The drmaa_job_name attribute specifies the job's name. A job name 
+%%   shall contain only alpha-numeric and '_' characters.
+%% @end
+%% --------------------------------------------------------------------
+-spec (job_name/1::(string ()) -> {'ok'} | {'error', string ()}).
 job_name (JobName) when is_list (JobName) ->
   gen_server:call (drmaa, {job_name, JobName}).
 
+%% --------------------------------------------------------------------
+%% @spec input_path (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_input_path attribute. 
+%%
+%%   Not supported now.
+%%
+%%   The drmaa_input_path attribute specifies the standard input path of 
+%%   the job. If set, this attribute's value specifies the network path 
+%%   of the job's input stream file. The value of the drmaa_input_path
+%%   attribute must be of the form:<br/>
+%%      [hostname]:file_path
+%%
+%%   When the drmaa:transfer_files attribute is supported and contains 
+%%   the atom 'input', the input file will be fetched by the DRMS from 
+%%   the specified host or from the submit host if no hostname is 
+%%   specified in the drmaa_input_path attribute value. When the 
+%%   drmaa:transfer_files attribute is not supported or does not contain 
+%%   the atom 'input', the input file is always expected at the host 
+%%   where the job is executed, regardless of any hostname specified in 
+%%   the drmaa_input_path attribute value.
+%%
+%%   If the DRMAA job template will be used for bulk job submission the
+%%   drmaa:placeholder (incr) can be used at any position within the 
+%%   drmaa_input_path attribute value to cause a substitution with the 
+%%   parametric job's index. A drmaa:placeholder (hd) at the beginning 
+%%   of the drmaa_input_path attribute value denotes the remaining 
+%%   portion of the drmaa_input_path attribute value as a relative file 
+%%   specification resolved relative to the job submitter's home 
+%%   directory at the host where the file is located. A drmaa:placeholder (wd)
+%%   at the beginning of the drmaa_input_path attribute value denotes 
+%%   the remaining portion of the drmaa_input_path attribute value as 
+%%   a relative file specification resolved relative to the job's
+%%   working directory at the host where the file is located. 
+%%
+%%   The drmaa_input_path attribute value must be specified in a syntax 
+%%   that is common at the host where the file is located. If set and 
+%%   the file can't be read the job enters the state DRMAA_PS_FAILED 
+%%   upon submission.
+%%
+%% @see transfer_files/1. <b>drmaa:transfer_files</b>
+%% @see placeholder/1. <b>drmaa:placeholder</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (input_path/1::(string ()) -> {'error', 'not_supported'}).
 input_path (InputPath) when is_list (InputPath) ->
   {error, not_supported}.
   %gen_server:call (drmaa, {input_path, InputPath}).
 
+%% --------------------------------------------------------------------
+%% @spec output_path (string ()) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_output_path attribute.
+%%
+%%   The drmaa_output_path attribute specifies the standard output path 
+%%   of the job. If set, this attribute's value specifies the network 
+%%   path of the job's output stream file. The value of the attribute 
+%%   must be of the form: <br/>
+%%      [hostname]:file_path
+%%
+%%   When the drmaa:transfer_files attribute is supported and contains 
+%%   the atom, 'output', the output file shall be transferred by the DRMS 
+%%   to the specified host or to the submit host if no hostname is 
+%%   specified in the drmaa_output_path attribute value. When the 
+%%   drmaa:transfer_files attribute is not supported or does not contain 
+%%   the atom, 'output', the output file is always kept at the host
+%%   where the job is executed, regardless of any hostname specified in 
+%%   the drmaa_output_path attribute value.
+%%
+%%   If the DRMAA job template will be used for bulk job submission the
+%%   drmaa:placeholder (incr) can be used at any position within the 
+%%   drmaa_output_path attribute value to cause a substitution with the 
+%%   parametric job's index. A drmaa:placeholder (hd) at the beginning 
+%%   of the drmaa_output_path attribute value denotes the remaining
+%%   portion of the drmaa_output_path attribute value as a relative file 
+%%   specification resolved relative to the job submitter's home 
+%%   directory at the host where the file is located. 
+%%   A drmaa:placeholder (wd) at the beginning of the drmaa_output_path 
+%%   attribute value denotes the remaining portion of the the 
+%%   drmaa_output_path attribute value as a relative file specification 
+%%   resolved relative to the job's working directory at the host where 
+%%   the file is located. 
+%%
+%%   The drmaa_output_path attribute value must be specified in a syntax 
+%%   that is common at the host where the file is located.
+%%
+%%   If set and the file can't be written before execution the job 
+%%   enters the state DRMAA_PS_FAILED upon submission.
+%%
+%% @see transfer_files/1. <b>drmaa:transfer_files</b>
+%% @see placeholder/1. <b>drmaa:placeholder</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (output_path/1::(string ()) -> {'ok'} | {'error', string ()}).
 output_path (OutputPath) when is_list (OutputPath) ->
   gen_server:call (drmaa, {output_path, OutputPath}).
 
+%% --------------------------------------------------------------------
+%% @spec error_path (string ()) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_error_path attribute.
+%%
+%%   The drmaa_error_path attribute specifies the standard error path 
+%%   of the job. If set, this attribute's value specifies the network 
+%%   path of the job's error stream file. The value of the 
+%%   drmaa_error_path attribute must be of the form: <br/>
+%%      [hostname]:file_path
+%%
+%%   When the drmaa:transfer_files attribute is supported and contains 
+%%   the atom, 'error', the output file shall be transferred by the DRMS 
+%%   to the specified host or to the submit host if no hostname is 
+%%   specified in the drmaa_error_path attribute value. When the 
+%%   drmaa:transfer_files attribute is not supported or does not contain 
+%%   the atom, 'error', the output file is always kept at the host where 
+%%   the job is executed, regardless of any hostname specified in the 
+%%   drmaa_error_path attribute value.
+%%
+%%   If the DRMAA job template will be used for bulk job submission the
+%%   drmaa:placeholder (incr) can be used at any position within the 
+%%   drmaa_error_path attribute value to cause a substitution with the 
+%%   parametric job's index. A drmaa:placeholder (hd) at the beginning 
+%%   of the drmaa_error_path attribute value denotes the remaining portion 
+%%   of the drmaa_error_path attribute value as a relative file 
+%%   specification resolved relative to the job submitter's home directory 
+%%   at the host where the file is located. A drmaa:placeholder (wd) at 
+%%   the beginning of the drmaa_error_path attribute value denotes the 
+%%   remaining portion of the the drmaa_error_path attribute value as a 
+%%   relative file specification resolved relative to the job's working 
+%%   directory at the host where the file is located. 
+%%
+%%   The drmaa_error_path attribute value must be specified in a syntax 
+%%   that is common at the host where the file is located. If set and the 
+%%   file can't be written before execution the job enters the state 
+%%   DRMAA_PS_FAILED upon submission.
+%%
+%% @see transfer_files/1. <b>drmaa:transfer_files</b>
+%% @see placeholder/1. <b>drmaa:placeholder</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (error_path/1::(string ()) -> {'ok'} | {'error', string ()}).
 error_path (ErrorPath) when is_list (ErrorPath) ->
   gen_server:call (drmaa, {error_path, ErrorPath}).
 
+%% --------------------------------------------------------------------
+%% @spec job_category (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_job_category attribute.
+%%
+%%   Not supported now.
+%%
+%%   The drmaa_job_catrgory attribute specifies the DRMAA job category. 
+%%   
+%%   See section 2.4.1 of the Distributed Resource Management Application 
+%%   API Specification 1.0 for more information about DRMAA job categories.
+%% @end
+%% --------------------------------------------------------------------
+-spec (job_category/1::(string ()) -> {'error', 'not_supported'}).
 job_category (_JobCategory) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec native_spec (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_native_specification attribute.
+%%
+%%   Not supported now.
+%%
+%%   The drmaa_native_specification attribute specifies the native 
+%%   submission options which shall be passed to the DRMS at job 
+%%   submission time. 
+%%
+%%   See section 2.4.2 of the Distributed Resource Management 
+%%   Application API Specification 1.0 for more information about 
+%%   DRMAA job categories.
+%% @end
+%% --------------------------------------------------------------------
+-spec (native_spec/1::(string ()) -> {'error', 'not_supported'}).
 native_spec (_NativeSpec) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec block_email (true | false) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_block_email attribute.
+%%
+%%   The drmaa_block_email attribute specifies whether the sending of 
+%%   email shall blocked or not. If the DRMS configuration or the 
+%%   drmaa:native_specification or drmaa:job_category attribute would 
+%%   normally cause email to be sent in association with job events, 
+%%   the drmaa_block_email attribute value can will override that 
+%%   setting, causing no email to be sent.
+%%
+%%   If the attribute's value is 'false', no email will be sent, 
+%%   regardless of DRMS configuration or other attribute values. 
+%%   If the attribute's value 'true', the sending of email is unaffected.
+%% @see native_spec/1. <b>drmaa:native_spec</b>
+%% @see job_category/1. <b>drmaa:job_category</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (block_email/1::('true' | 'false') -> {'ok'} | {'error', string ()}).
 block_email (true) ->
   gen_server:call (drmaa, {block_email, "1"});
 block_email (false) ->
   gen_server:call (drmaa, {block_email, "0"}).
 
+%% --------------------------------------------------------------------
+%% @spec start_time (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_start_time attribute.
+%%
+%%   Not supported now.
+%%
+%%   The drmaa_start_time attribute specifies the earliest point in time 
+%%   when the job may be eligible to be run. drmaa_start_time attribute 
+%%   value is of the format: <br/>
+%%     [[[[CC]YY/]MM/]DD] hh:mm[:ss] [{-|+}UU:uu]<br/>
+%%   where
+%%    <ul>
+%%      <li>CC is the first two digits of the year [19,)</li>
+%%      <li>YY is the last two digits of the year [00,99]</li>
+%%      <li>MM is the two digits of the month [01,12]</li>
+%%      <li>DD is the two digit day of the month [01,31]</li>
+%%      <li>hh is the two digit hour of the day [00,23]</li>
+%%      <li>mm is the two digit minute of the day [00,59]</li>
+%%      <li>ss is the two digit second of the minute [00,61]</li>
+%%      <li>UU is the two digit hours since (before) UTC [-11,12]</li>
+%%      <li>uu is the two digit minutes since (before) UTC [00,59]</li>
+%%    </ul>
+%%
+%%   If the optional UTC-offset is not specified, the offset associated 
+%%   with the local timezone will be used. If any of the other optional 
+%%   fields are not specified, the time shall be resolved to the 
+%%   soonest time which can be constructed using the values of the 
+%%   specified fields, which is in the future at the time of resolution. 
+%%   That is to say that if the attribute's value is "10:00", and it is
+%%   resolved to a concrete time at 11:01am on November 24th, the time 
+%%   will be resolved to 10:00am on November 25th, because that is the 
+%%   soonest time which matches the specified fields and is in the future. 
+%%   If at 9:34am on December 1st the same time string is resolved 
+%%   again (such as by reusing the containing job template for another 
+%%   job submission), it will resolve to 10:00am on December 1st.
+%% @end
+%% --------------------------------------------------------------------
+-spec (start_time/1::(string ()) -> {'error', 'not_supported'}).
 start_time (_StartTime) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec deadline_time (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_deadline_time attribute.
+%% 
+%%   Not supported now.
+%%
+%%   The drmaa_start_time attribute specifies a deadline after which 
+%%   the DRMS will terminate a job. drmaa_start_time attribute value 
+%%   is of the format: <br/>
+%%      [[[[CC]YY/]MM/]DD] hh:mm[:ss] [{-|+}UU:uu]<br/>
+%%   where
+%%    <ul>
+%%     <li>CC is the first two digits of the year [19,)</li>
+%%     <li>YY is the last two digits of the year [00,99]</li>
+%%     <li>MM is the two digits of the month [01,12]</li>
+%%     <li>DD is the two digit day of the month [01,31]</li>
+%%     <li>hh is the two digit hour of the day [00,23]</li>
+%%     <li>mm is the two digit minute of the day [00,59]</li>
+%%     <li>ss is the two digit second of the minute [00,61]</li>
+%%     <li>UU is the two digit hours since (before) UTC [-11,12]</li>
+%%     <li>uu is the two digit minutes since (before) UTC [00,59]</li>
+%%    </ul>
+%%
+%%   If the optional UTC-offset is not specified, the offset 
+%%   associated with the local timezone will be used. If any of the 
+%%   other optional fields are not specified, the time shall be 
+%%   resolved to the soonest time which can be constructed using the 
+%%   values of the specified fields, which is in the future at the 
+%%   time of resolution. That is to say that if the attribute's value 
+%%   is "10:00", and it is resolved to a concrete time at 11:01am on 
+%%   November 24th, the time will be resolved to 10:00am on November 
+%%   25th, because that is the soonest time which matches the specified 
+%%   fields and is in the future. If at 9:34am on December 1st the same 
+%%   time string is resolved again (such as by reusing the containing 
+%%   job template for another job submission), it will resolve to 
+%%   10:00am on December 1st.
+%% @end
+%% --------------------------------------------------------------------
+-spec (deadline_time/1::(string ()) -> {'error', 'not_supported'}).
 deadline_time (_DeadlineTime) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec hlimit (string ()) -> {error, not_supproted}
+%% @doc
+%%   Sets drmaa_wct_hlimit attribute.
+%%  
+%%   Not supported now.
+%%
+%%   The drmaa_wct_hlimit attribute specifies how much wall clock time 
+%%   a job is allowed to consume before its limit has been exceeded. 
+%%   The DRMS shall terminate a job that has exceeded its wallclock time 
+%%   limit. Suspended time shall also be accumulated here.
+%%
+%%   This attribute's value must be of the form:<br/>
+%%     [[h:]m:]s<br/>
+%%   where
+%%    <ul>
+%%      <li>h is one or more digits representing hours</li>
+%%      <li>m is one or more digits representing minutes</li>
+%%      <li>s is one or more digits representing seconds</li>
+%%    </ul>
+%% @end
+%% --------------------------------------------------------------------
+-spec (hlimit/1::(string ()) -> {'error', 'not_supported'}).
 hlimit (_HLimit) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec slimit (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_wct_slimit attribute.
+%%
+%%   Not supported now.
+%%
+%%   The drmaa_wct_slimit attribute specifies an estimate as to how much 
+%%   wall clock time the job will need to complete. Suspended time shall 
+%%   also be accumulated here. This attribute is intended to assist the 
+%%   scheduler. If the time specified by this attribute's value in 
+%%   insufficient, the DRMAA implementation may impose a scheduling 
+%%   penalty.
+%%
+%%   This attribute's value MUST be of the form:<br/>
+%%      [[h:]m:]s<br/>
+%%   where
+%%    <ul>
+%%       <li>h is one or more digits representing hours</li>
+%%       <li>m is one or more digits representing minutes</li>
+%%       <li>s is one or more digits representing seconds</li>
+%%    </ul>
+%% @end
+%% --------------------------------------------------------------------
+-spec (slimit/1::(string ()) -> {'error', 'not_supported'}).
 slimit (_SLimit) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec hlimit_duration (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_duration_hlimit attribute.
+%% 
+%%   Not supported now.
+%%
+%%   The drmaa_duration_hlimit attribute specifies how long the job may 
+%%   be in a running state before its time limit has been exceeded, 
+%%   and therefore is terminated by the DRMS.
+%%
+%%   This attribute's value MUST be of the form:<br/>
+%%      [[h:]m:]s<br/>
+%%   where
+%%    <ul>
+%%       <li>h is one or more digits representing hours</li>
+%%       <li>m is one or more digits representing minutes</li>
+%%       <li>s is one or more digits representing seconds</li>
+%%    </ul>
+%% @end
+%% --------------------------------------------------------------------
+-spec (hlimit_duration/1::(string ()) -> {'error', 'not_supported'}).
 hlimit_duration (_Duration) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec slimit_duration (string ()) -> {error, not_supported}
+%% @doc
+%%   Sets drmaa_duration_slimit attribute.
+%%
+%%   Not supported now.
+%%
+%%   The drmaa_duration_slimit attribute specifies an estimate as to how 
+%%   long the job will need to remain in a running state in order to 
+%%   complete. This attribute is intended to assist the scheduler. If the 
+%%   time specified by this attribute's value in insufficient, the DRMAA 
+%%   implementation may impose a scheduling penalty.
+%%
+%%   This attribute's value MUST be of the form:<br/>
+%%       [[h:]m:]s<br/>
+%%   where
+%%    <ul>
+%%        <li>h is one or more digits representing hours</li>
+%%        <li>m is one or more digits representing minutes</li>
+%%        <li>s is one or more digits representing seconds</li>
+%%    </ul>
+%% @end
+%% --------------------------------------------------------------------
+-spec (slimit_duration/1::(string ()) -> {'error', 'not_supported'}).
 slimit_duration (_Duration) ->
   {error, not_supported}.
 
+%% --------------------------------------------------------------------
+%% @spec transfer_files ([input | output | error]) -> {ok} | {error, string ()}
+%% @doc
+%%   Sets drmaa_transfer_files attribute.
+%%
+%%   The drmaa_transfer_files attribute specifies, which of the standard 
+%%   I/O files (stdin, stdout and stderr) are to be transferred to/from 
+%%   the execution host. 
+%%
+%%   The attribute's value may contain any of the atoms, 'error', 'input'
+%%   and 'output'. If the atom, 'error', is present, the error stream will 
+%%   be transferred. If the atom, 'input', is present, the input stream 
+%%   will be transferred. If the atom, 'output', is present, the output 
+%%   stream will be transferred. See the drmaa:input_path, drmaa:output_path 
+%%   and drmaa:error_path for information about how to specify the standard 
+%%   input file, standard output file and standard error file and the 
+%%   effects of this attribute's value.
+%% @see input_path/1. <b>drmaa:input_path</b>
+%% @see output_path/1. <b>drmaa:output_path</b>
+%% @see error_path/1. <b>drmaa:error_path</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (transfer_files/1::(['input' | 'output' | 'error']) -> 
+    {'ok'} | {'error', string ()}).
 transfer_files (List) when is_list (List) ->
   gen_server:call (drmaa, {transfer_files, List}).
 
+%% --------------------------------------------------------------------
+%% @spec placeholder (Type) -> string ()
+%%        Type = incr | hd | home | home_dir | wd | working_dir
+%% @doc
+%%   Returns DRMAA_PLACEHOLDER_[HD | WD | INCR].
+%% 
+%%   hd, home, home_dir - the DRMAA_PLACEHOLDER_HD directive is used with 
+%%   the drmaa:working_dir, drmaa:input_path, drmaa:output_path, and 
+%%   drmaa:error_path attributes to represent the user's home directory.
+%%
+%%   wd, working_dir - the DRMAA_PLACEHOLDER_WD directive is used with 
+%%   the drmaa:input_path, drmaa:output_path, and drmaa:error_path 
+%%   attributes to represent the job working directory.
+%%   
+%%   incr - the DRMAA_PLACEHOLDER_INCR directive is used with the 
+%%   drmaa:working_dir, drmaa:input_path, drmaa:output_path, and 
+%%   drmaa:error_path attributes to represent the individual id of each 
+%%   subjob in the parametric job. See drmaa:run_jobs.
+%%
+%% @see working_dir/1. <b>drmaa:working_dir</b>
+%% @see input_path/1. <b>drmaa:input_path</b>
+%% @see error_path/1. <b>drmaa:error_path</b>
+%% @see output_path/1. <b>drmaa:output_path</b>
+%% @see run_jobs/3. <b>drmaa:run_jobs</b>
+%% @end
+%% --------------------------------------------------------------------
+-type (placeholder_type () :: 'incr' | 'hd' | 'home' | 'home_dir' | 'wd'
+  | 'working_dir').
+-spec (placeholder/1::(placeholder_type ()) -> string ()).
 placeholder (incr) ->
   gen_server:call (drmaa, {placeholder_incr});
 placeholder (hd) ->
@@ -435,16 +966,86 @@ placeholder (wd) ->
 placeholder (working_dir) ->
   gen_server:call (drmaa, {placeholder_wd}).
 
+%% --------------------------------------------------------------------
+%% @spec job_ids (all | any) -> string ()
+%% @doc
+%%   Returns DRMAA_JOB_IDS_SESSION_[ALL | ANY].
+%%
+%%   all - The DRMAA_JOB_IDS_SESSION_ALL directive is used to indicate 
+%%   to drmaa:control() and drmaa:synchronize() that all jobs currently 
+%%   active in the session should be the operation's target.
+%%
+%%   any - The DRMAA_JOB_IDS_SESSION_ANY directive is used to indicate 
+%%   to drmaa_wait() that any job currently active in the session should 
+%%   be the operation's target.
+%%
+%% @see control/2. <b>drmaa:control</b>
+%% @see synchronize/2. <b>drmaa:synchronize</b>
+%% @see wait/2. <b>drmaa:wait</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (job_ids/1::('all' | 'any') -> string ()).
 job_ids (all) ->
   gen_server:call (drmaa, {job_ids_all});
 job_ids (any) ->
   gen_server:call (drmaa, {job_ids_any}).
 
+%% --------------------------------------------------------------------
+%% @spec timeout (forever | no_wait) -> int ()
+%% @doc
+%%   Returns a DRMAA_TIMEOUT_[WAIT_FOREVER | NO_WAIT].
+%%
+%%   forever - The DRMAA_TIMEOUT_WAIT_FOREVER directive is used as to 
+%%   indicate to drmaa:wait() and drmaa:synchronize() that the 
+%%   implementation should block indefinitely until the requested job 
+%%   exit status information is available.
+%%
+%%   no_wait - The DRMAA_TIMEOUT_NO_WAIT directive is used as to 
+%%   indicate to drmaa:wait() and drmaa:synchronize() that the 
+%%   implementation should not block if the requested job exit status
+%%   information is not available.
+%% @see wait/2. <b>drmaa:wait</b>
+%% @see synchronize/2. <b>drmaa:synchronize</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (timeout/1::('forever' | 'no_wait') -> integer ()).
 timeout (forever) ->
   gen_server:call (drmaa, {timeout, forever});
 timeout (no_wait) ->
   gen_server:call (drmaa, {timeout, no_wait}).
 
+%% --------------------------------------------------------------------
+%% @spec control_tag (Tag) -> integer ()
+%%        Tag = suspend | resume | hold | release | terminate
+%%
+%% @doc
+%%   Returns DRMAA_CONTROL_[SUSPEND | RESUME | HOLD | RELEASE | TERMINATE]
+%%
+%%   suspend - The DRMAA_CONTROL_SUSPEND directive is used to indicate 
+%%   to drmaa:control() that the requested job should be placed in a user 
+%%   suspend state.
+%%
+%%   resume - The DRMAA_CONTROL_RESUME directive is used to indicate 
+%%   to drmaa:control() that the requested job should be resumed from 
+%%   a user suspend state.
+%%
+%%   hold - The DRMAA_CONTROL_HOLD directive is used to indicate 
+%%   to drmaa:control() that the requested job should be placed into a 
+%%   user hold state.
+%%
+%%   release - The DRMAA_CONTROL_RELEASE directive is used to indicate 
+%%   to drmaa:control() that the requested job should the released from 
+%%   a user hold state.
+%%  
+%%   terminate - The DRMAA_CONTROL_TERMINATE directive is used to 
+%%   indicate to drmaa:control() that the requested job should be 
+%%   terminated.
+%%
+%% @see control/2. <b>drmaa:control</b>
+%% @end
+%% --------------------------------------------------------------------
+-spec (control_tag/1::('suspend' | 'resume' | 'hold' | 'release' 
+    | 'terminate') -> integer ()).
 control_tag (suspend) -> 
   gen_server:call (drmaa, {control_tag, suspend});
 control_tag (resume) -> 
@@ -457,7 +1058,15 @@ control_tag (terminate) ->
   gen_server:call (drmaa, {control_tag, terminate}).
 
 %% gen_server callbacks %%
-
+%% --------------------------------------------------------------------
+%% @spec init ([]) -> {ok, State} | {ok, State, Timeout} |
+%%                    ignore | {stop, Reason}
+%% @doc Initiates the server.
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
+-type(init_return() :: {'ok', tuple()} | {'ok', tuple(), integer()} | 'ignore' | {'stop', any()}).
+-spec(init/1::([]) -> init_return()).
 init ([]) ->
   process_flag (trap_exit, true),
   SearchDir = filename:join ([filename:dirname (code:which (?MODULE)), "..", "ebin"]),
@@ -471,15 +1080,48 @@ init ([]) ->
       {stop, failed}
   end.
 
+%% --------------------------------------------------------------------
+%% @spec code_change (OldVsn, State, Extra) -> {ok, NewState}
+%% @doc Convert process state when code is changed
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
 code_change (_OldVsn, State, _Extra) ->
   {ok, State}.
 
+%% --------------------------------------------------------------------
+%% @spec handle_cast(Msg, State) -> {noreply, State} |
+%%                                      {noreply, State, Timeout} |
+%%                                      {stop, Reason, State}
+%% @doc Handling cast messages.
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
 handle_cast (_Msg, State) ->
   {noreply, State}.
 
+%% --------------------------------------------------------------------
+%% @spec handle_info(Info, State) -> {noreply, State} |
+%%                                       {noreply, State, Timeout} |
+%%                                       {stop, Reason, State}
+%% @doc Handling all non call/cast messages.
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
 handle_info (_Info, State) ->
   {noreply, State}.
 
+%% --------------------------------------------------------------------
+%% @spec terminate(Reason, State) -> void()
+%% @doc This function is called by a gen_server when it is about to
+%% terminate. It should be the opposite of Module:init/1 and do any 
+%% necessary cleaning up. When it returns, the gen_server terminates 
+%% with Reason.
+%%
+%% The return value is ignored.
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
 terminate (normal, #state {port = Port}) ->
   port_command (Port, term_to_binary ({close, nop})),
   port_close (Port),
@@ -487,6 +1129,17 @@ terminate (normal, #state {port = Port}) ->
 terminate (_Reason, _State) ->
   ok.
 
+%% --------------------------------------------------------------------
+%% @spec handle_call(Request, From, State) -> {reply, Reply, State} |
+%%                                      {reply, Reply, State, Timeout} |
+%%                                      {noreply, State} |
+%%                                      {noreply, State, Timeout} |
+%%                                      {stop, Reason, Reply, State} |
+%%                                      {stop, Reason, State}
+%% @doc Handling call messages.
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
 handle_call ({allocate_job_template}, _From, #state {port = Port} = State) ->
   Reply = drmaa:control_drv (Port, ?CMD_ALLOCATE_JOB_TEMPLATE),
   {reply, Reply, State};
@@ -604,10 +1257,42 @@ control_impl (Port, Action, JobID) ->
   Args = string:join ([erlang:integer_to_list (Action) | [JobID]], ","),
   drmaa:control_drv (Port, ?CMD_CONTROL, erlang:list_to_binary (Args)).
 
+
+%% --------------------------------------------------------------------
+%% @spec control_drv (Port::port (), Command::integer ()) -> {ok} 
+%%                                          | {ok, job_id ()}
+%%                                          | {ok, job_ids ()}
+%%                                          | {ok, string ()}
+%%                                          | string ()
+%%                                          | integer ()
+%%                                          | {error, string ()}
+%% @doc Sends Command to the Port.
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
+-spec (control_drv/2::(port (), integer ()) -> {'ok'} | wait_result () 
+    | {'error', string ()} | {'ok', job_id ()} | {'ok', job_ids()}
+    | {'ok', string ()} | string () | integer ()).
 control_drv (Port, Command) when is_port (Port) and is_integer (Command) ->
   port_control (Port, Command, <<"_">>),
   wait_result (Port).
 
+%% --------------------------------------------------------------------
+%% @spec control_drv (Port::port (), Command::integer (), Data::binary ()) -> 
+%%                                            {ok} 
+%%                                          | {ok, job_id ()}
+%%                                          | {ok, job_ids ()}
+%%                                          | {ok, string ()}
+%%                                          | string ()
+%%                                          | integer ()
+%%                                          | {error, string ()}
+%% @doc Sends Command and Data to the Port.
+%% @end
+%% @hidden
+%% --------------------------------------------------------------------
+-spec (control_drv/2::(port (), integer (), binary ()) -> {'ok'} | wait_result () 
+    | {'error', string ()} | {'ok', job_id ()} | {'ok', job_ids()}
+    | {'ok', string ()} | string () | integer ()).
 control_drv (Port, Command, Data) 
   when is_port (Port) and is_integer (Command) and is_binary (Data) ->
     port_control (Port, Command, Data),
