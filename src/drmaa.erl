@@ -1290,7 +1290,7 @@ control_drv (Port, Command) when is_port (Port) and is_integer (Command) ->
 %% @end
 %% @hidden
 %% --------------------------------------------------------------------
--spec (control_drv/2::(port (), integer (), binary ()) -> {'ok'} | wait_result () 
+-spec (control_drv/3::(port (), integer (), binary ()) -> {'ok'} | wait_result () 
     | {'error', string ()} | {'ok', job_id ()} | {'ok', job_ids()}
     | {'ok', string ()} | string () | integer ()).
 control_drv (Port, Command, Data) 
