@@ -1,2 +1,7 @@
 *.beam
 *.so
+autom4te.cache
+config.log
+config.status
+Makefile
+priv/Makefile
