@@ -3,11 +3,11 @@ all: compile
 
 compile:
 	test -d ebin || mkdir ebin
-	erl -make
+	@ERL@ -make
 	cd priv && make
 
 debug:
-	erl -make
+	@ERL@ -make
 	cd priv && make debug
 
 clean:
