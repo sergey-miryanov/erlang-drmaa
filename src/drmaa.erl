@@ -1076,8 +1076,7 @@ init ([]) ->
       Port = open_port ({spawn, "drmaa_drv"}, [binary]),
       {ok, #state {port = Port, ops = []}};
     {error, Error} ->
-      io:format ("Error loading drmaa driver: ~p~n", [erl_ddll:format_error (Error)]),
-      {stop, failed}
+      {stop, string:join (["Error loading drmaa driver: ", erl_ddll:format_error (Error)], "")}
   end.
 
 %% --------------------------------------------------------------------
